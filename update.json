@@ -1,6 +1,6 @@
 {
   "version": "1.2.0",
-  "notes": "Nouveautés\n- Ajout de source : Xtream Codes ou Adresse MAC (le lien M3U manuel n'est plus proposé)\n- Activation par adresse MAC : la playlist assignée par le support est chargée automatiquement\n- Mises a jour automatiques de la playlist activee par MAC",
+  "notes": "Nouveautés\n\n- Ajout de source : Xtream Codes ou Adresse MAC (le lien M3U manuel n'est plus proposé à la saisie)\n- Activation par adresse MAC : chaque appareil a son adresse MAC (Sources → Activer par adresse MAC) ; une fois activée côté support, la playlist se charge automatiquement\n- La playlist activée par MAC se met à jour toute seule si le support la modifie\n",
   "windows_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.2.0/NexoraTV-Setup-1.2.0.exe",
   "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.2.0/NexoraTV-1.2.0.apk",
   "mandatory": false
