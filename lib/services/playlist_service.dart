@@ -8,6 +8,7 @@ import '../models/epg_entry.dart';
 import '../models/playlist_source.dart';
 import '../models/series.dart';
 import 'm3u_parser.dart';
+import 'mac_portal_service.dart';
 import 'net_config.dart';
 import 'xtream_client.dart';
 
@@ -147,15 +148,42 @@ class PlaylistException implements Exception {
 
 /// Charge une [PlaylistSource] en [LoadedPlaylist], quel que soit son type.
 class PlaylistService {
-  PlaylistService({Dio? dio})
+  PlaylistService({Dio? dio, MacPortalService? macPortal})
       : _dio = dio ??
             Dio(BaseOptions(
               connectTimeout: const Duration(seconds: 15),
               receiveTimeout: const Duration(seconds: 60),
               headers: {'User-Agent': runtimeUserAgent},
-            ));
+            )),
+        _macPortal = macPortal ?? MacPortalService();
 
   final Dio _dio;
+  final MacPortalService _macPortal;
+
+  /// Si [source] a été ajoutée par activation MAC, re-résout sa playlist
+  /// auprès du portail (l'admin a pu la changer). En cas d'échec réseau, on
+  /// garde silencieusement la dernière URL connue plutôt que de faire
+  /// échouer le chargement.
+  Future<PlaylistSource> _resolveMac(
+      PlaylistSource source, void Function(String) log) async {
+    final mac = source.activationMac;
+    if (mac == null) return source;
+    try {
+      final playlist = await _macPortal.resolve(mac);
+      log('portail MAC : playlist "${playlist.name}" résolue');
+      return source.copyWith(
+        name: playlist.name,
+        m3uUrl: playlist.m3uUrl,
+        epgUrl: playlist.epgUrl ?? '',
+      );
+    } on MacPortalException catch (e) {
+      if (source.m3uUrl == null || source.m3uUrl!.isEmpty) {
+        throw PlaylistException(e.message);
+      }
+      log('portail MAC injoignable (${e.kind.name}), utilise le cache : $e');
+      return source;
+    }
+  }
 
   Future<LoadedPlaylist> load(
     PlaylistSource source, {
@@ -168,6 +196,7 @@ class PlaylistService {
 
     switch (source.kind) {
       case SourceKind.m3uUrl:
+        source = await _resolveMac(source, log);
         return LoadedPlaylist(live: await _loadM3u(source.m3uUrl!));
       case SourceKind.xtream:
         final client = XtreamClient(source, onDiag: log);
@@ -263,6 +292,23 @@ class PlaylistService {
           throw PlaylistException(e.message);
         }
     }
+  }
+
+  /// Active une adresse MAC auprès du portail NexoraTV : résout sa playlist
+  /// puis la vérifie, sans encore l'ajouter aux sources (à la charge de
+  /// l'appelant). Lève [MacPortalException] (MAC inconnu / portail
+  /// injoignable) ou [PlaylistException] (playlist résolue mais invalide).
+  Future<PlaylistSource> activateByMac(String mac) async {
+    final playlist = await _macPortal.resolve(mac);
+    final source = PlaylistSource(
+      name: playlist.name,
+      kind: SourceKind.m3uUrl,
+      m3uUrl: playlist.m3uUrl,
+      epgUrl: playlist.epgUrl,
+      activationMac: mac,
+    );
+    await validate(source);
+    return source;
   }
 
   Future<List<Channel>> _loadM3u(String url) async {

@@ -16,4 +16,8 @@ class Brand {
   /// `{ "count": 12, "average": 4.9, "reviews": [ { "author", "rating",
   ///    "date", "text" } ] }`
   static const avisEndpoint = 'https://nexoratv.fr/api/avis';
+
+  /// Portail MAC : `GET playlistApi?mac=AA:BB:CC:DD:EE:FF` renvoie
+  /// `{ "name", "m3uUrl", "epgUrl" }` si le MAC est activé (404 sinon).
+  static const playlistApi = 'https://nexoratv.fr/api/playlist';
 }

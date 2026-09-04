@@ -30,10 +30,18 @@ class SourcesScreen extends ConsumerWidget {
               itemBuilder: (context, i) {
                 final s = sources[i];
                 return ListTile(
-                  leading: Icon(s.isXtream ? Icons.vpn_key : Icons.link),
+                  leading: Icon(s.isXtream
+                      ? Icons.vpn_key
+                      : (s.isMacActivated
+                          ? Icons.router_outlined
+                          : Icons.link)),
                   title: Text(s.name),
                   subtitle: Text(
-                    s.isXtream ? '${s.host} · ${s.username}' : s.m3uUrl ?? '',
+                    s.isXtream
+                        ? '${s.host} · ${s.username}'
+                        : (s.isMacActivated
+                            ? 'MAC ${s.activationMac}'
+                            : s.m3uUrl ?? ''),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

@@ -20,6 +20,7 @@ class PlaylistSource {
     this.username,
     this.password,
     this.xtreamOutput = XtreamOutput.ts,
+    this.activationMac,
     DateTime? createdAt,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now();
@@ -39,9 +40,16 @@ class PlaylistSource {
   final String? password;
   final XtreamOutput xtreamOutput;
 
+  /// Non nul si cette source (M3U) a été ajoutée via activation par adresse
+  /// MAC (`AddSourceScreen`, onglet MAC) : `m3uUrl`/`epgUrl` sont alors
+  /// re-résolus auprès du portail à chaque chargement, cf.
+  /// `PlaylistService.load`.
+  final String? activationMac;
+
   final DateTime createdAt;
 
   bool get isXtream => kind == SourceKind.xtream;
+  bool get isMacActivated => activationMac != null;
 
   PlaylistSource copyWith({
     String? name,
@@ -51,6 +59,7 @@ class PlaylistSource {
     String? username,
     String? password,
     XtreamOutput? xtreamOutput,
+    String? activationMac,
   }) {
     return PlaylistSource(
       id: id,
@@ -62,6 +71,7 @@ class PlaylistSource {
       username: username ?? this.username,
       password: password ?? this.password,
       xtreamOutput: xtreamOutput ?? this.xtreamOutput,
+      activationMac: activationMac ?? this.activationMac,
       createdAt: createdAt,
     );
   }
@@ -76,6 +86,7 @@ class PlaylistSource {
         'username': username,
         'password': password,
         'xtreamOutput': xtreamOutput.name,
+        'activationMac': activationMac,
         'createdAt': createdAt.toIso8601String(),
       };
 
@@ -139,6 +150,7 @@ class PlaylistSource {
         (o) => o.name == json['xtreamOutput'],
         orElse: () => XtreamOutput.ts,
       ),
+      activationMac: json['activationMac'] as String?,
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
     );
   }
