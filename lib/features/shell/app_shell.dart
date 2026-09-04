@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/playlist_source.dart';
 import '../../state/account_provider.dart';
+import '../../state/avis_provider.dart';
 import '../../state/channels_provider.dart';
 import '../../state/sources_provider.dart';
 import '../../widgets/loading_view.dart';
@@ -190,7 +191,10 @@ class _TopBar extends ConsumerWidget {
             icon: const Icon(Icons.refresh),
             onPressed: current == null
                 ? null
-                : () => refreshPlaylist(ref, current!),
+                : () {
+                    refreshPlaylist(ref, current!);
+                    ref.invalidate(avisProvider);
+                  },
           ),
           if (onSettings != null)
             IconButton(
