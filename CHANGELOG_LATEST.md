@@ -1,5 +1,5 @@
-Nouveautés
+Correctif important
 
-- Ajout de source : Xtream Codes ou Adresse MAC (le lien M3U manuel n'est plus proposé à la saisie)
-- Activation par adresse MAC : chaque appareil a son adresse MAC (Sources → Activer par adresse MAC) ; une fois activée côté support, la playlist se charge automatiquement
-- La playlist activée par MAC se met à jour toute seule si le support la modifie
+- Corrigé : l'application se figeait quelques secondes à chaque changement de réglage (Paramètres)
+- Activation par adresse MAC : les films et séries sont maintenant disponibles quand le lien assigné est un lien Xtream
+- Interface simplifiée : barre du haut allégée, informations internes retirées des réglages
