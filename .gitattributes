@@ -1,0 +1,16 @@
+# Normalise les fins de ligne en LF dans le dépôt (multi-plateforme).
+* text=auto eol=lf
+
+# Fichiers Windows qui doivent rester en CRLF
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.iss text eol=crlf
+
+# Binaires
+*.png binary
+*.jpg binary
+*.ico binary
+*.jks binary
+*.keystore binary
+*.ttf binary
+*.otf binary
