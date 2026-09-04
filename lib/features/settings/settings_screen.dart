@@ -470,23 +470,6 @@ class _UpdatesPage extends ConsumerWidget {
                 notifier.patch((o) => o.copyWith(checkUpdatesOnStart: v)),
           ),
           ListTile(
-            leading: const Icon(Icons.link),
-            title: const Text('URL du manifeste'),
-            subtitle: Text(
-              s.updateManifestUrl.isEmpty
-                  ? 'Non configurée'
-                  : s.updateManifestUrl,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            onTap: () => _editText(
-              context,
-              'URL du manifeste de mise à jour',
-              s.updateManifestUrl,
-              (v) => notifier.patch((o) => o.copyWith(updateManifestUrl: v)),
-            ),
-          ),
-          ListTile(
             leading: const Icon(Icons.download_outlined),
             title: const Text('Vérifier maintenant'),
             onTap: () => _checkNow(context, ref),

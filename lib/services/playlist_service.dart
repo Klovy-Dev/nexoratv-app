@@ -161,9 +161,12 @@ class PlaylistService {
   final MacPortalService _macPortal;
 
   /// Si [source] a été ajoutée par activation MAC, re-résout sa playlist
-  /// auprès du portail (l'admin a pu la changer). En cas d'échec réseau, on
-  /// garde silencieusement la dernière URL connue plutôt que de faire
-  /// échouer le chargement.
+  /// auprès du portail (l'admin a pu la changer) — et la fait passer en
+  /// Xtream si le lien assigné est en fait un lien `get.php` Xtream (cas le
+  /// plus courant : films/séries ne sont sinon pas disponibles, un M3U brut
+  /// n'étant chargé qu'en direct). En cas d'échec réseau, on garde
+  /// silencieusement la dernière config connue plutôt que de faire échouer
+  /// le chargement.
   Future<PlaylistSource> _resolveMac(
       PlaylistSource source, void Function(String) log) async {
     final mac = source.activationMac;
@@ -171,16 +174,21 @@ class PlaylistService {
     try {
       final playlist = await _macPortal.resolve(mac);
       log('portail MAC : playlist "${playlist.name}" résolue');
-      return source.copyWith(
+      return PlaylistSource(
+        id: source.id,
+        createdAt: source.createdAt,
         name: playlist.name,
+        kind: SourceKind.m3uUrl,
         m3uUrl: playlist.m3uUrl,
-        epgUrl: playlist.epgUrl ?? '',
-      );
+        epgUrl: playlist.epgUrl,
+        activationMac: mac,
+      ).upgradedToXtreamIfPossible();
     } on MacPortalException catch (e) {
-      if (source.m3uUrl == null || source.m3uUrl!.isEmpty) {
-        throw PlaylistException(e.message);
-      }
-      log('portail MAC injoignable (${e.kind.name}), utilise le cache : $e');
+      final hasCache =
+          source.kind == SourceKind.xtream || (source.m3uUrl ?? '').isNotEmpty;
+      if (!hasCache) throw PlaylistException(e.message);
+      log('portail MAC injoignable (${e.kind.name}), utilise la config en '
+          'cache : $e');
       return source;
     }
   }
@@ -194,9 +202,12 @@ class PlaylistService {
       onDiag?.call(m);
     }
 
+    if (source.activationMac != null) {
+      source = await _resolveMac(source, log);
+    }
+
     switch (source.kind) {
       case SourceKind.m3uUrl:
-        source = await _resolveMac(source, log);
         return LoadedPlaylist(live: await _loadM3u(source.m3uUrl!));
       case SourceKind.xtream:
         final client = XtreamClient(source, onDiag: log);
@@ -306,7 +317,7 @@ class PlaylistService {
       m3uUrl: playlist.m3uUrl,
       epgUrl: playlist.epgUrl,
       activationMac: mac,
-    );
+    ).upgradedToXtreamIfPossible();
     await validate(source);
     return source;
   }

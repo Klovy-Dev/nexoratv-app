@@ -31,12 +31,17 @@ final playlistForSourceProvider =
 
   final cache = ref.watch(playlistCacheProvider);
   final service = ref.watch(playlistServiceProvider);
-  final settings = ref.watch(settingsValueProvider);
+  // .select : ne réexécute ce provider (re-décompresse le cache, ~34k
+  // éléments) que si l'un de ces deux réglages change réellement — pas à
+  // chaque réglage sans rapport (thème, MAJ, etc.), qui gelait l'UI le temps
+  // de tout relire/décoder.
+  final (cacheHours, autoRefreshOnStart) = ref.watch(settingsValueProvider
+      .select((s) => (s.cacheHours, s.autoRefreshOnStart)));
   final cached = await cache.read(source);
 
-  final maxAge = Duration(hours: settings.cacheHours);
+  final maxAge = Duration(hours: cacheHours);
   final fresh = cached != null &&
-      !settings.autoRefreshOnStart &&
+      !autoRefreshOnStart &&
       DateTime.now().difference(cached.savedAt) < maxAge;
 
   if (fresh) return cached.playlist;

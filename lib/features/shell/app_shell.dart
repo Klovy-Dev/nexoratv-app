@@ -9,8 +9,6 @@ import '../../widgets/loading_view.dart';
 import '../../widgets/nav.dart';
 import '../catalog/catalog_browser.dart';
 import '../dashboard/dashboard_page.dart';
-import '../epg/epg_screen.dart';
-import '../search/global_search_screen.dart';
 import '../series/series_browser.dart';
 import '../settings/settings_screen.dart';
 import '../watchlist/watchlist_page.dart';
@@ -35,14 +33,6 @@ class _AppShellState extends ConsumerState<AppShell> {
     (icon: Icons.bookmark_border, sel: Icons.bookmark, label: 'Ma liste'),
   ];
 
-  void _openSearch() {
-    final pl = ref.read(currentPlaylistProvider)?.value;
-    final src = ref.read(selectedSourceProvider);
-    if (pl == null || src == null) return;
-    pushFade(context,
-        GlobalSearchScreen(sourceId: src.id, playlist: pl));
-  }
-
   @override
   Widget build(BuildContext context) {
     final source = ref.watch(selectedSourceProvider);
@@ -59,11 +49,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     final loading = ref.watch(currentPlaylistProvider)?.isLoading ?? false;
     final body = Column(
       children: [
-        _TopBar(
-          current: source,
-          onSearch: _openSearch,
-          onSettings: () => pushFade(context, const SettingsScreen()),
-        ),
+        _TopBar(current: source),
         SizedBox(
           height: 2,
           child: loading ? const LinearProgressIndicator(minHeight: 2) : null,
@@ -136,14 +122,8 @@ class _AppShellState extends ConsumerState<AppShell> {
 }
 
 class _TopBar extends ConsumerWidget {
-  const _TopBar({
-    required this.current,
-    required this.onSearch,
-    required this.onSettings,
-  });
+  const _TopBar({required this.current});
   final PlaylistSource? current;
-  final VoidCallback onSearch;
-  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -181,26 +161,11 @@ class _TopBar extends ConsumerWidget {
           const Spacer(),
           const _ExpiryChip(),
           IconButton(
-            tooltip: 'Guide TV',
-            icon: const Icon(Icons.calendar_view_month_outlined),
-            onPressed: () => pushFade(context, const EpgScreen()),
-          ),
-          IconButton(
-            tooltip: 'Rechercher',
-            icon: const Icon(Icons.search),
-            onPressed: onSearch,
-          ),
-          IconButton(
             tooltip: 'Rafraîchir',
             icon: const Icon(Icons.refresh),
             onPressed: current == null
                 ? null
                 : () => refreshPlaylist(ref, current!),
-          ),
-          IconButton(
-            tooltip: 'Paramètres',
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: onSettings,
           ),
         ],
       ),

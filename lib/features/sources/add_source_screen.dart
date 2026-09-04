@@ -163,13 +163,19 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
       );
       final notifier = ref.read(sourcesProvider.notifier);
       if (_isMacEdit) {
+        // Reprend la config résolue (Xtream si le lien assigné en est un,
+        // sinon M3U) en gardant l'id existant.
         await notifier.editSource(PlaylistSource(
           id: widget.existing!.id,
           createdAt: widget.existing!.createdAt,
           name: source.name,
-          kind: SourceKind.m3uUrl,
+          kind: source.kind,
           m3uUrl: source.m3uUrl,
           epgUrl: source.epgUrl,
+          host: source.host,
+          username: source.username,
+          password: source.password,
+          xtreamOutput: source.xtreamOutput,
           activationMac: mac,
         ));
         ref.invalidate(playlistForSourceProvider(widget.existing!.id));

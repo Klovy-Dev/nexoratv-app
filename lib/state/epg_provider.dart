@@ -14,9 +14,10 @@ final epgServiceProvider = Provider((ref) => EpgService());
 /// Guide XMLTV complet de la source courante : `{channelId: [programmes]}`.
 final epgGuideProvider =
     FutureProvider.autoDispose<Map<String, List<EpgEntry>>>((ref) async {
-  final settings = ref.watch(settingsValueProvider);
+  final epgEnabled =
+      ref.watch(settingsValueProvider.select((s) => s.epgEnabled));
   final source = ref.watch(selectedSourceProvider);
-  if (!settings.epgEnabled || source == null) return const {};
+  if (!epgEnabled || source == null) return const {};
   ref.keepAlive();
   return ref.watch(epgServiceProvider).guide(source);
 });
@@ -49,8 +50,9 @@ EpgEntry? nextOn(List<EpgEntry> list) {
 /// utilisé dans le lecteur, ne dépend pas du guide complet.
 final shortEpgProvider =
     FutureProvider.family<List<EpgEntry>, String?>((ref, streamId) async {
-  final settings = ref.watch(settingsValueProvider);
-  if (!settings.epgEnabled || streamId == null) return const [];
+  final epgEnabled =
+      ref.watch(settingsValueProvider.select((s) => s.epgEnabled));
+  if (!epgEnabled || streamId == null) return const [];
   final source = ref.watch(selectedSourceProvider);
   if (source == null) return const [];
 

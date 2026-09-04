@@ -129,6 +129,7 @@ class PlaylistSource {
       password: x.password,
       xtreamOutput: out,
       epgUrl: epgUrl,
+      activationMac: activationMac,
       createdAt: createdAt,
     );
   }

@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../theme.dart';
@@ -109,68 +112,119 @@ class AppSettings {
         showWatchedRow: showWatchedRow ?? this.showWatchedRow,
         pauseOnBackground: pauseOnBackground ?? this.pauseOnBackground,
       );
+
+  Map<String, dynamic> toJson() => {
+        'themeMode': themeMode.name,
+        'cacheHours': cacheHours,
+        'autoRefreshOnStart': autoRefreshOnStart,
+        'showChannelNumbers': showChannelNumbers,
+        'keepScreenAwake': keepScreenAwake,
+        'checkUpdatesOnStart': checkUpdatesOnStart,
+        'updateManifestUrl': updateManifestUrl,
+        'tmdbApiKey': tmdbApiKey,
+        'subtitleScale': subtitleScale,
+        'epgEnabled': epgEnabled,
+        'preloadEpg': preloadEpg,
+        'mergeSimilarCategories': mergeSimilarCategories,
+        'userAgent': userAgent,
+        'playerBufferMb': playerBufferMb,
+        'showWatchedRow': showWatchedRow,
+        'pauseOnBackground': pauseOnBackground,
+      };
+
+  factory AppSettings.fromJson(Map<String, dynamic> j) {
+    const d = AppSettings();
+    return AppSettings(
+      themeMode: AppThemeMode.values.firstWhere(
+        (m) => m.name == j['themeMode'],
+        orElse: () => d.themeMode,
+      ),
+      cacheHours: j['cacheHours'] as int? ?? d.cacheHours,
+      autoRefreshOnStart:
+          j['autoRefreshOnStart'] as bool? ?? d.autoRefreshOnStart,
+      showChannelNumbers:
+          j['showChannelNumbers'] as bool? ?? d.showChannelNumbers,
+      keepScreenAwake: j['keepScreenAwake'] as bool? ?? d.keepScreenAwake,
+      checkUpdatesOnStart:
+          j['checkUpdatesOnStart'] as bool? ?? d.checkUpdatesOnStart,
+      updateManifestUrl:
+          j['updateManifestUrl'] as String? ?? d.updateManifestUrl,
+      tmdbApiKey: j['tmdbApiKey'] as String? ?? d.tmdbApiKey,
+      subtitleScale: (j['subtitleScale'] as num?)?.toDouble() ?? d.subtitleScale,
+      epgEnabled: j['epgEnabled'] as bool? ?? d.epgEnabled,
+      preloadEpg: j['preloadEpg'] as bool? ?? d.preloadEpg,
+      mergeSimilarCategories:
+          j['mergeSimilarCategories'] as bool? ?? d.mergeSimilarCategories,
+      userAgent: j['userAgent'] as String? ?? d.userAgent,
+      playerBufferMb:
+          (j['playerBufferMb'] as int? ?? d.playerBufferMb).clamp(8, 128),
+      showWatchedRow: j['showWatchedRow'] as bool? ?? d.showWatchedRow,
+      pauseOnBackground:
+          j['pauseOnBackground'] as bool? ?? d.pauseOnBackground,
+    );
+  }
 }
 
 class SettingsRepository {
-  static const _themeMode = 'set_theme_mode';
-  static const _cacheHours = 'set_cache_hours';
-  static const _autoRefresh = 'set_auto_refresh';
-  static const _showNumbers = 'set_show_numbers';
-  static const _keepAwake = 'set_keep_awake';
-  static const _checkUpdates = 'set_check_updates';
-  static const _updateUrl = 'set_update_url';
-  static const _tmdbKey = 'set_tmdb_key';
-  static const _subScale = 'set_sub_scale';
-  static const _epg = 'set_epg';
-  static const _preloadEpg = 'set_preload_epg';
-  static const _mergeCats = 'set_merge_cats';
-  static const _userAgent = 'set_user_agent';
-  static const _bufferMb = 'set_buffer_mb';
-  static const _watchedRow = 'set_watched_row';
-  static const _pauseBg = 'set_pause_bg';
+  /// Tous les réglages dans **une seule** clé JSON. Sur Windows,
+  /// `shared_preferences` réécrit l'intégralité du fichier de prefs à chaque
+  /// `set*` : avec l'ancien schéma (16 clés séparées), une seule bascule
+  /// déclenchait 16 écritures disque successives et figeait l'UI une ou
+  /// deux secondes (« Non répondant »). Une seule clé = une seule écriture.
+  static const _blob = 'settings_json';
+
+  // Anciennes clés (schéma < 2026-09-04), lues une fois pour migrer.
+  static const _legacyKeys = <String>[
+    'set_theme_mode', 'set_cache_hours', 'set_auto_refresh',
+    'set_show_numbers', 'set_keep_awake', 'set_check_updates',
+    'set_update_url', 'set_tmdb_key', 'set_sub_scale', 'set_epg',
+    'set_preload_epg', 'set_merge_cats', 'set_user_agent', 'set_buffer_mb',
+    'set_watched_row', 'set_pause_bg',
+  ];
 
   Future<AppSettings> load() async {
     final p = await SharedPreferences.getInstance();
-    return AppSettings(
+    final raw = p.getString(_blob);
+    if (raw != null) {
+      try {
+        return AppSettings.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      } catch (_) {
+        // Blob corrompu : repli sur les valeurs par défaut.
+      }
+    }
+
+    // Migration depuis l'ancien schéma « une clé par réglage ».
+    final migrated = AppSettings(
       themeMode: AppThemeMode.values.firstWhere(
-        (m) => m.name == p.getString(_themeMode),
+        (m) => m.name == p.getString('set_theme_mode'),
         orElse: () => AppThemeMode.dark,
       ),
-      cacheHours: p.getInt(_cacheHours) ?? 12,
-      autoRefreshOnStart: p.getBool(_autoRefresh) ?? false,
-      showChannelNumbers: p.getBool(_showNumbers) ?? true,
-      keepScreenAwake: p.getBool(_keepAwake) ?? true,
-      checkUpdatesOnStart: p.getBool(_checkUpdates) ?? true,
-      updateManifestUrl: p.getString(_updateUrl) ?? kDefaultUpdateManifestUrl,
-      tmdbApiKey: p.getString(_tmdbKey) ?? '',
-      subtitleScale: p.getDouble(_subScale) ?? 1.0,
-      epgEnabled: p.getBool(_epg) ?? true,
-      preloadEpg: p.getBool(_preloadEpg) ?? false,
-      mergeSimilarCategories: p.getBool(_mergeCats) ?? false,
-      userAgent: p.getString(_userAgent) ?? '',
-      playerBufferMb: (p.getInt(_bufferMb) ?? 32).clamp(8, 128),
-      showWatchedRow: p.getBool(_watchedRow) ?? true,
-      pauseOnBackground: p.getBool(_pauseBg) ?? true,
+      cacheHours: p.getInt('set_cache_hours') ?? 12,
+      autoRefreshOnStart: p.getBool('set_auto_refresh') ?? false,
+      showChannelNumbers: p.getBool('set_show_numbers') ?? true,
+      keepScreenAwake: p.getBool('set_keep_awake') ?? true,
+      checkUpdatesOnStart: p.getBool('set_check_updates') ?? true,
+      updateManifestUrl:
+          p.getString('set_update_url') ?? kDefaultUpdateManifestUrl,
+      tmdbApiKey: p.getString('set_tmdb_key') ?? '',
+      subtitleScale: p.getDouble('set_sub_scale') ?? 1.0,
+      epgEnabled: p.getBool('set_epg') ?? true,
+      preloadEpg: p.getBool('set_preload_epg') ?? false,
+      mergeSimilarCategories: p.getBool('set_merge_cats') ?? false,
+      userAgent: p.getString('set_user_agent') ?? '',
+      playerBufferMb: (p.getInt('set_buffer_mb') ?? 32).clamp(8, 128),
+      showWatchedRow: p.getBool('set_watched_row') ?? true,
+      pauseOnBackground: p.getBool('set_pause_bg') ?? true,
     );
+    await save(migrated);
+    for (final k in _legacyKeys) {
+      unawaited(p.remove(k));
+    }
+    return migrated;
   }
 
   Future<void> save(AppSettings s) async {
     final p = await SharedPreferences.getInstance();
-    await p.setString(_themeMode, s.themeMode.name);
-    await p.setInt(_cacheHours, s.cacheHours);
-    await p.setBool(_autoRefresh, s.autoRefreshOnStart);
-    await p.setBool(_showNumbers, s.showChannelNumbers);
-    await p.setBool(_keepAwake, s.keepScreenAwake);
-    await p.setBool(_checkUpdates, s.checkUpdatesOnStart);
-    await p.setString(_updateUrl, s.updateManifestUrl);
-    await p.setString(_tmdbKey, s.tmdbApiKey);
-    await p.setDouble(_subScale, s.subtitleScale);
-    await p.setBool(_epg, s.epgEnabled);
-    await p.setBool(_preloadEpg, s.preloadEpg);
-    await p.setBool(_mergeCats, s.mergeSimilarCategories);
-    await p.setString(_userAgent, s.userAgent);
-    await p.setInt(_bufferMb, s.playerBufferMb);
-    await p.setBool(_watchedRow, s.showWatchedRow);
-    await p.setBool(_pauseBg, s.pauseOnBackground);
+    await p.setString(_blob, jsonEncode(s.toJson()));
   }
 }
