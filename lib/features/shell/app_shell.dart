@@ -9,6 +9,7 @@ import '../../widgets/loading_view.dart';
 import '../../widgets/nav.dart';
 import '../catalog/catalog_browser.dart';
 import '../dashboard/dashboard_page.dart';
+import '../search/global_search_screen.dart';
 import '../series/series_browser.dart';
 import '../settings/settings_screen.dart';
 import '../watchlist/watchlist_page.dart';
@@ -33,6 +34,13 @@ class _AppShellState extends ConsumerState<AppShell> {
     (icon: Icons.bookmark_border, sel: Icons.bookmark, label: 'Ma liste'),
   ];
 
+  void _openSearch() {
+    final pl = ref.read(currentPlaylistProvider)?.value;
+    final src = ref.read(selectedSourceProvider);
+    if (pl == null || src == null) return;
+    pushFade(context, GlobalSearchScreen(sourceId: src.id, playlist: pl));
+  }
+
   @override
   Widget build(BuildContext context) {
     final source = ref.watch(selectedSourceProvider);
@@ -49,7 +57,14 @@ class _AppShellState extends ConsumerState<AppShell> {
     final loading = ref.watch(currentPlaylistProvider)?.isLoading ?? false;
     final body = Column(
       children: [
-        _TopBar(current: source),
+        _TopBar(
+          current: source,
+          // Sur desktop, Recherche/Paramètres restent dans la barre
+          // latérale ; sur mobile c'est le seul accès, on les garde ici.
+          onSearch: wide ? null : _openSearch,
+          onSettings:
+              wide ? null : () => pushFade(context, const SettingsScreen()),
+        ),
         SizedBox(
           height: 2,
           child: loading ? const LinearProgressIndicator(minHeight: 2) : null,
@@ -122,8 +137,12 @@ class _AppShellState extends ConsumerState<AppShell> {
 }
 
 class _TopBar extends ConsumerWidget {
-  const _TopBar({required this.current});
+  const _TopBar({required this.current, this.onSearch, this.onSettings});
   final PlaylistSource? current;
+
+  /// Non nuls uniquement sur mobile (desktop : barre latérale).
+  final VoidCallback? onSearch;
+  final VoidCallback? onSettings;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -160,6 +179,12 @@ class _TopBar extends ConsumerWidget {
                     fontSize: 16, fontWeight: FontWeight.w600)),
           const Spacer(),
           const _ExpiryChip(),
+          if (onSearch != null)
+            IconButton(
+              tooltip: 'Rechercher',
+              icon: const Icon(Icons.search),
+              onPressed: onSearch,
+            ),
           IconButton(
             tooltip: 'Rafraîchir',
             icon: const Icon(Icons.refresh),
@@ -167,6 +192,12 @@ class _TopBar extends ConsumerWidget {
                 ? null
                 : () => refreshPlaylist(ref, current!),
           ),
+          if (onSettings != null)
+            IconButton(
+              tooltip: 'Paramètres',
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: onSettings,
+            ),
         ],
       ),
     );
