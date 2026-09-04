@@ -75,6 +75,20 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
       - run: flutter pub get
+      - name: Réglages Gradle pour runner CI
+        # android/gradle.properties est calibré pour une machine 4 Go (plafonds
+        # mémoire bas) : sur les runners GitHub ça provoque un OOM Metaspace.
+        # On relève les limites juste pour la CI.
+        run: |
+          cat > android/gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:ReservedCodeCacheSize=512m
+          org.gradle.daemon=false
+          org.gradle.parallel=true
+          org.gradle.configureondemand=true
+          android.useAndroidX=true
+          android.newDsl=false
+          android.builtInKotlin=false
+          EOF
       - name: Clé de signature release
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
