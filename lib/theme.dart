@@ -46,6 +46,10 @@ ThemeData buildAppTheme(AppThemeMode mode) {
       color: surface,
       elevation: 0,
     ),
+    // Visible nettement plus marqué que le défaut Flutter (quasi
+    // imperceptible) : indispensable pour la navigation télécommande
+    // (Android TV / Fire Stick / box) en usage « 10 pieds ».
+    focusColor: nexoraPurple.withValues(alpha: .35),
     appBarTheme: AppBarTheme(
       backgroundColor: scaffold,
       surfaceTintColor: Colors.transparent,

@@ -1,3 +1,5 @@
-Correctif
+Nouveauté : support télécommande
 
-- Les avis clients sur l'accueil restaient figés tant que l'app n'était pas redémarrée. Ils se rafraîchissent maintenant automatiquement (toutes les 20 min) et via le bouton « Rafraîchir »
+- Les jaquettes (Films, Séries, Accueil) sont maintenant navigables à la télécommande sur Android TV, Fire Stick et box Android — un anneau met en évidence l'élément sélectionné, OK ouvre la fiche
+- Lecteur vidéo : touches avance/retour rapide et OK dédiées prises en charge
+- Focus plus visible partout dans l'app (chaînes, boutons, menus)

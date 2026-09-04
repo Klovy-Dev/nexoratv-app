@@ -17,6 +17,7 @@ import '../../state/watch_history_provider.dart';
 import '../../theme.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/nav.dart';
+import '../../widgets/tv_focusable.dart';
 import '../catalog/poster_card.dart';
 import '../detail/media_detail_screen.dart';
 import '../player/player_screen.dart';
@@ -498,16 +499,16 @@ class _ChannelPoster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return TvFocusable(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Column(
+      builder: (context, focused, hovered) => Column(
         children: [
           Expanded(
             child: Container(
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
+                border: tvFocusBorder(context, focused),
               ),
               padding: const EdgeInsets.all(14),
               child: channel.logo == null

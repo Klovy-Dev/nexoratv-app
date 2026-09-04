@@ -300,16 +300,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
     } else if (key == LogicalKeyboardKey.arrowDown ||
         key == LogicalKeyboardKey.channelDown) {
       _zap(1);
-    } else if (key == LogicalKeyboardKey.arrowRight && _isVod) {
+    } else if ((key == LogicalKeyboardKey.arrowRight ||
+            key == LogicalKeyboardKey.mediaFastForward) &&
+        _isVod) {
       _player.seek(_player.state.position + const Duration(seconds: 10));
       _showControls();
-    } else if (key == LogicalKeyboardKey.arrowLeft && _isVod) {
+    } else if ((key == LogicalKeyboardKey.arrowLeft ||
+            key == LogicalKeyboardKey.mediaRewind) &&
+        _isVod) {
       _player.seek(_player.state.position - const Duration(seconds: 10));
       _showControls();
     } else if (key == LogicalKeyboardKey.space ||
+        key == LogicalKeyboardKey.select ||
         key == LogicalKeyboardKey.mediaPlayPause) {
-      _player.playOrPause();
-      _showControls();
+      // `select` = touche OK d'une télécommande (Android TV / Fire Stick) :
+      // affiche les commandes si elles sont masquées, sinon lecture/pause.
+      if (!_controlsVisible) {
+        _showControls();
+      } else {
+        _player.playOrPause();
+        _showControls();
+      }
     } else if (key == LogicalKeyboardKey.keyF) {
       _toggleFullscreen();
     } else if (key == LogicalKeyboardKey.keyP) {
