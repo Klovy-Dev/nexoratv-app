@@ -4,7 +4,7 @@ import '../../theme.dart';
 
 /// URL par défaut du manifeste de mise à jour (à héberger, ex. GitHub Releases).
 const String kDefaultUpdateManifestUrl =
-    'https://raw.githubusercontent.com/klovy/nexoratv-app/main/update.json';
+    'https://raw.githubusercontent.com/Klovy-Dev/nexoratv-app/main/update.json';
 
 /// User-Agent par défaut envoyé aux serveurs IPTV.
 const String kDefaultUserAgent = 'VLC/3.0.20 LibVLC/3.0.20';

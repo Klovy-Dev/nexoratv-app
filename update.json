@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "notes": "Version initiale de NexoraTV.\n- TV / Films / Séries\n- Lecteur plein écran, reprise VOD, historique, recherche globale\n- Mises à jour intégrées",
-  "windows_url": "https://github.com/klovy/nexoratv-app/releases/download/v1.0.0/NexoraTV-Setup-1.0.0.exe",
-  "android_url": "https://github.com/klovy/nexoratv-app/releases/download/v1.0.0/NexoraTV-1.0.0.apk",
+  "windows_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.0.0/NexoraTV-Setup-1.0.0.exe",
+  "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.0.0/NexoraTV-1.0.0.apk",
   "mandatory": false
 }

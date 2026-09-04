@@ -88,7 +88,7 @@ class SettingsScreen extends ConsumerWidget {
             leading: const Icon(Icons.bug_report_outlined),
             title: const Text('Signaler un bug / suggestion'),
             trailing: const Icon(Icons.open_in_new, size: 18),
-            onTap: () => _open('https://github.com/klovy/nexoratv-app/issues'),
+            onTap: () => _open('https://github.com/Klovy-Dev/nexoratv-app/issues'),
           ),
 
           const _SectionTitle('Autres'),
