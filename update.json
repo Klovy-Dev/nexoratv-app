@@ -1,7 +1,7 @@
 {
-  "version": "1.2.3",
-  "notes": "Correctif\n\n- Les avis clients sur l'accueil restaient figés tant que l'app n'était pas redémarrée. Ils se rafraîchissent maintenant automatiquement (toutes les 20 min) et via le bouton « Rafraîchir »\n",
-  "windows_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.2.3/NexoraTV-Setup-1.2.3.exe",
-  "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.2.3/NexoraTV-1.2.3.apk",
+  "version": "1.3.0",
+  "notes": "Nouveauté : support télécommande\n\n- Les jaquettes (Films, Séries, Accueil) sont maintenant navigables à la télécommande sur Android TV, Fire Stick et box Android — un anneau met en évidence l'élément sélectionné, OK ouvre la fiche\n- Lecteur vidéo : touches avance/retour rapide et OK dédiées prises en charge\n- Focus plus visible partout dans l'app (chaînes, boutons, menus)\n",
+  "windows_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.3.0/NexoraTV-Setup-1.3.0.exe",
+  "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.3.0/NexoraTV-1.3.0.apk",
   "mandatory": false
 }
