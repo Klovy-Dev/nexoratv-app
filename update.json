@@ -1,7 +1,7 @@
 {
-  "version": "1.2.2",
-  "notes": "Correctif\n\n- Sur mobile : Recherche et Paramètres remis dans la barre du haut (ils avaient disparu par erreur dans la 1.2.1)\n",
-  "windows_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.2.2/NexoraTV-Setup-1.2.2.exe",
-  "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.2.2/NexoraTV-1.2.2.apk",
+  "version": "1.2.3",
+  "notes": "Correctif\n\n- Les avis clients sur l'accueil restaient figés tant que l'app n'était pas redémarrée. Ils se rafraîchissent maintenant automatiquement (toutes les 20 min) et via le bouton « Rafraîchir »\n",
+  "windows_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.2.3/NexoraTV-Setup-1.2.3.exe",
+  "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.2.3/NexoraTV-1.2.3.apk",
   "mandatory": false
 }
