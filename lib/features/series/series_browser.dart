@@ -13,10 +13,12 @@ import '../../state/settings_provider.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/nav.dart';
 import '../../widgets/pin_dialog.dart';
+import '../catalog/category_panel.dart';
 import '../catalog/poster_card.dart';
 import '../detail/media_detail_screen.dart';
 
-/// Grille des séries (utilisée dans la coquille).
+/// Grille des séries (utilisée dans la coquille) — même mise en page que les
+/// films : panneau de catégories à gauche sur desktop, grille de jaquettes.
 class SeriesBrowser extends ConsumerStatefulWidget {
   const SeriesBrowser({super.key, required this.sourceId});
   final String sourceId;
@@ -28,6 +30,7 @@ class SeriesBrowser extends ConsumerStatefulWidget {
 class _SeriesBrowserState extends ConsumerState<SeriesBrowser> {
   final _controller = TextEditingController();
   final _grid = ScrollController();
+  final _panel = ScrollController();
   Timer? _debounce;
   String _query = '';
   String? _group;
@@ -37,6 +40,7 @@ class _SeriesBrowserState extends ConsumerState<SeriesBrowser> {
     _debounce?.cancel();
     _controller.dispose();
     _grid.dispose();
+    _panel.dispose();
     super.dispose();
   }
 
@@ -67,6 +71,7 @@ class _SeriesBrowserState extends ConsumerState<SeriesBrowser> {
     final merge = ref.watch(
         settingsValueProvider.select((s) => s.mergeSimilarCategories));
     String key(String raw) => merge ? mergedQualityCategory(raw) : raw;
+
     final hidden = <String>{};
     final groups = <({String name, String label, int count})>[];
     for (final g in groupCountsOf(all.map((s) => key(s.groupOrDefault)))) {
@@ -90,24 +95,38 @@ class _SeriesBrowserState extends ConsumerState<SeriesBrowser> {
     }
 
     final recent = mostRecent<Series>(
-        all, (s) => s.addedAt, (s) => int.tryParse(s.seriesId), 40);
+        all, (s) => s.addedAt, (s) => int.tryParse(s.seriesId), kRecentCount);
     final showRecent = recent.length >= 3;
 
-    Iterable<Series> visible;
-    if (_group == '__recent__') {
-      visible = recent.take(40);
+    Iterable<Series> visibleSrc;
+    if (_group == kRecentGroup) {
+      visibleSrc = recent.take(kRecentCount);
     } else {
-      visible = all.where((s) {
+      visibleSrc = all.where((s) {
         if (_group != null) return key(s.groupOrDefault) == _group;
         return !hidden.contains(key(s.groupOrDefault));
       });
     }
     if (_query.isNotEmpty) {
-      visible = visible.where((s) => s.name.toLowerCase().contains(_query));
+      visibleSrc =
+          visibleSrc.where((s) => s.name.toLowerCase().contains(_query));
     }
-    final list = visible.toList();
+    final list = visibleSrc.toList();
 
-    return Column(
+    final isWide = MediaQuery.sizeOf(context).width >= 900;
+
+    final panel = CategoryPanel(
+      groups: groups,
+      total: all.length,
+      selected: _group,
+      wide: isWide,
+      showRecent: showRecent,
+      recentCount: recent.length.clamp(0, kRecentCount),
+      controller: isWide ? _panel : null,
+      onSelect: (g) => _selectGroup(g, parental),
+    );
+
+    final gridColumn = Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
@@ -120,24 +139,7 @@ class _SeriesBrowserState extends ConsumerState<SeriesBrowser> {
             onChanged: _onChanged,
           ),
         ),
-        SizedBox(
-          height: 46,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            children: [
-              _chip('Toutes (${all.length})', _group == null,
-                  () => setState(() => _group = null)),
-              if (showRecent)
-                _chip('✨ Ajoutées récemment (${recent.length.clamp(0, 40)})',
-                    _group == '__recent__',
-                    () => setState(() => _group = '__recent__')),
-              for (final g in groups)
-                _chip('${g.label} (${g.count})', _group == g.name,
-                    () => _selectGroup(g.name, parental)),
-            ],
-          ),
-        ),
+        if (!isWide) SizedBox(height: 46, child: panel),
         const Divider(height: 1),
         Expanded(
           child: list.isEmpty
@@ -156,6 +158,9 @@ class _SeriesBrowserState extends ConsumerState<SeriesBrowser> {
                         imageUrl: s.cover,
                         year: s.year,
                         rating: s.rating,
+                        synopsis: (s.plot?.trim().isNotEmpty ?? false)
+                            ? s.plot
+                            : s.genre,
                         heroTag: 'poster_${widget.sourceId}_${s.id}',
                         onTap: () => pushFade(
                           context,
@@ -169,20 +174,25 @@ class _SeriesBrowserState extends ConsumerState<SeriesBrowser> {
         ),
       ],
     );
+
+    if (!isWide) return gridColumn;
+    return Row(
+      children: [
+        SizedBox(width: 250, child: panel),
+        const VerticalDivider(width: 1),
+        Expanded(child: gridColumn),
+      ],
+    );
   }
 
-  Future<void> _selectGroup(String cat, ParentalSettings parental) async {
-    if (parental.isLocked(widget.sourceId, 'series', cat)) {
+  Future<void> _selectGroup(String? cat, ParentalSettings parental) async {
+    if (cat != null &&
+        cat != kRecentGroup &&
+        parental.isLocked(widget.sourceId, 'series', cat)) {
       final ok = await askPin(context,
           verify: (p) => ref.read(parentalValueProvider).checkPin(p));
       if (!ok) return;
     }
     setState(() => _group = cat);
   }
-
-  Widget _chip(String label, bool sel, VoidCallback onTap) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-        child: ChoiceChip(
-            label: Text(label), selected: sel, onSelected: (_) => onTap()),
-      );
 }

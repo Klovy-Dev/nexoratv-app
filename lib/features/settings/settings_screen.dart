@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../brand.dart';
 import '../../services/storage/settings_repository.dart';
 import '../../services/update_service.dart';
 import '../../state/account_provider.dart';
@@ -85,10 +86,25 @@ class SettingsScreen extends ConsumerWidget {
 
           const _SectionTitle('Aide'),
           ListTile(
-            leading: const Icon(Icons.bug_report_outlined),
-            title: const Text('Signaler un bug / suggestion'),
+            leading: const Icon(Icons.support_agent_outlined),
+            title: const Text('Contacter le support'),
+            subtitle: const Text('Bug, question ou suggestion'),
             trailing: const Icon(Icons.open_in_new, size: 18),
-            onTap: () => _open('https://github.com/Klovy-Dev/nexoratv-app/issues'),
+            onTap: () => _open(Brand.contact),
+          ),
+          ListTile(
+            leading: const Icon(Icons.chat_bubble_outline),
+            title: const Text('WhatsApp'),
+            subtitle: const Text(Brand.whatsappLabel),
+            trailing: const Icon(Icons.open_in_new, size: 18),
+            onTap: () => _open(Brand.whatsapp),
+          ),
+          ListTile(
+            leading: const Icon(Icons.send_outlined),
+            title: const Text('Telegram'),
+            subtitle: const Text(Brand.telegramLabel),
+            trailing: const Icon(Icons.open_in_new, size: 18),
+            onTap: () => _open(Brand.telegram),
           ),
 
           const _SectionTitle('Autres'),
@@ -291,17 +307,10 @@ class _InterfacePage extends ConsumerWidget {
           const _SectionTitle('Thème'),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: SegmentedButton<AppThemeMode>(
-              segments: const [
-                ButtonSegment(value: AppThemeMode.dark, label: Text('Sombre')),
-                ButtonSegment(
-                    value: AppThemeMode.amoled, label: Text('AMOLED')),
-                ButtonSegment(value: AppThemeMode.light, label: Text('Clair')),
-              ],
-              selected: {s.themeMode},
-              showSelectedIcon: false,
-              onSelectionChanged: (v) =>
-                  notifier.patch((o) => o.copyWith(themeMode: v.first)),
+            child: _ThemePicker(
+              selected: s.themeMode,
+              onSelected: (m) =>
+                  notifier.patch((o) => o.copyWith(themeMode: m)),
             ),
           ),
 
@@ -668,6 +677,94 @@ class _NavTile extends StatelessWidget {
         trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
       );
+}
+
+/// Sélecteur de thème : Sombre · Clair · « Bientôt disponible » (verrouillé,
+/// réservé au futur thème premium).
+class _ThemePicker extends StatelessWidget {
+  const _ThemePicker({required this.selected, required this.onSelected});
+
+  final AppThemeMode selected;
+  final ValueChanged<AppThemeMode> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    Widget pill({
+      required String label,
+      IconData? icon,
+      bool active = false,
+      bool locked = false,
+      VoidCallback? onTap,
+    }) {
+      return Expanded(
+        child: Opacity(
+          opacity: locked ? .5 : 1,
+          child: Material(
+            color: active
+                ? scheme.primary.withValues(alpha: .22)
+                : scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  children: [
+                    Icon(icon,
+                        size: 18,
+                        color: active ? scheme.primary : null),
+                    const SizedBox(height: 4),
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight:
+                            active ? FontWeight.w700 : FontWeight.w500,
+                        color: active ? scheme.primary : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        pill(
+          label: 'Sombre',
+          icon: Icons.dark_mode_outlined,
+          active: selected == AppThemeMode.dark,
+          onTap: () => onSelected(AppThemeMode.dark),
+        ),
+        const SizedBox(width: 8),
+        pill(
+          label: 'Clair',
+          icon: Icons.light_mode_outlined,
+          active: selected == AppThemeMode.light,
+          onTap: () => onSelected(AppThemeMode.light),
+        ),
+        const SizedBox(width: 8),
+        pill(
+          label: 'Bientôt\ndisponible',
+          icon: Icons.lock_outline,
+          locked: true,
+          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Un thème premium arrive bientôt.'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _SectionTitle extends StatelessWidget {

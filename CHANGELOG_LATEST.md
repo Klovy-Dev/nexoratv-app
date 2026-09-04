@@ -1,9 +1,9 @@
-Version initiale de NexoraTV.
+Nouveautés
 
-- TV / Films / Séries, accueil en rails, Ma liste
-- Lecteur plein écran : reprise VOD, historique, zapping, pistes audio/sous-titres
-- Guide EPG complet, contrôle parental PIN
-- Recherche globale, favoris, gestion des catégories
-- Thèmes dark/amoled/light, métadonnées TMDB
-- Infos d'abonnement Xtream, mises à jour intégrées
-- Windows (installeur + portable) et Android (APK signé)
+- Séries : même présentation que les films (panneau de catégories à gauche
+  sur desktop, grille de jaquettes)
+- Synopsis affiché sur les fiches détail et sous les jaquettes des grilles
+- Accueil : nouveau bandeau NexoraTV (site officiel, WhatsApp, Telegram,
+  support) à la place du film mis en avant ; les carrousels sont conservés
+- Barre latérale plus compacte
+- Thèmes : Sombre et Clair (un thème premium arrivera plus tard)

@@ -17,6 +17,7 @@ class PosterCard extends StatefulWidget {
     this.onPlay,
     this.onSecondary,
     this.secondaryIcon,
+    this.synopsis,
   });
 
   final String title;
@@ -24,6 +25,9 @@ class PosterCard extends StatefulWidget {
   final String? subtitle;
   final double? rating;
   final int? year;
+
+  /// Résumé court affiché sous le titre (2 lignes max). Ignoré si vide.
+  final String? synopsis;
   final double progress;
   final String? badge;
   final Object? heroTag;
@@ -153,6 +157,22 @@ class _PosterCardState extends State<PosterCard> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                     fontSize: 11, color: Theme.of(context).hintColor),
+              ),
+            if ((widget.synopsis ?? '').trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  widget.synopsis!.trim(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    height: 1.25,
+                    color: Theme.of(context)
+                        .hintColor
+                        .withValues(alpha: .8),
+                  ),
+                ),
               ),
           ],
         ),

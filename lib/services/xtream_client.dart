@@ -201,6 +201,13 @@ class XtreamClient {
           rating: _parseRating(s['rating']),
           year: _parseYear('${s['year'] ?? s['releaseDate'] ?? ''}'),
           addedAt: _parseEpoch('${s['added'] ?? ''}'),
+          plot: kind == MediaKind.movie
+              ? _nullIfEmpty(
+                  '${s['plot'] ?? s['description'] ?? s['overview'] ?? ''}')
+              : null,
+          genre: kind == MediaKind.movie
+              ? _nullIfEmpty('${s['genre'] ?? ''}')
+              : null,
         ),
       );
     }

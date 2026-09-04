@@ -1,17 +1,20 @@
-import 'dart:math';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../brand.dart';
 import '../../models/channel.dart';
 import '../../models/series.dart';
+import '../../services/avis_service.dart';
 import '../../services/playlist_service.dart';
+import '../../state/avis_provider.dart';
 import '../../state/channels_provider.dart';
 import '../../state/favorites_provider.dart';
 import '../../state/settings_provider.dart';
 import '../../state/sources_provider.dart';
 import '../../state/watch_history_provider.dart';
+import '../../theme.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/nav.dart';
 import '../catalog/poster_card.dart';
@@ -71,15 +74,10 @@ class _Dashboard extends ConsumerWidget {
 
     final recentMovies = playlist.recentMovies(20);
     final recentSeries = playlist.recentSeries(12);
-    final hero = _pickHero(recentMovies, playlist.movies);
 
     return ListView(
       children: [
-        if (hero != null)
-          _Hero(
-            movie: hero,
-            sourceId: sourceId,
-          ),
+        const _InfoPanel(),
         if (resume.isNotEmpty)
           _Rail(
             title: 'Reprendre',
@@ -173,109 +171,225 @@ class _Dashboard extends ConsumerWidget {
     );
   }
 
-  Channel? _pickHero(List<Channel> recent, List<Channel> all) {
-    final pool = recent.isNotEmpty ? recent : all;
-    final rated = pool.where((m) => (m.rating ?? 0) >= 6 && m.logo != null).toList();
-    final source = rated.isNotEmpty ? rated : pool.where((m) => m.logo != null).toList();
-    if (source.isEmpty) return null;
-    return source[Random(DateTime.now().day).nextInt(source.length)];
-  }
 }
 
-class _Hero extends StatelessWidget {
-  const _Hero({required this.movie, required this.sourceId});
-  final Channel movie;
-  final String sourceId;
+/// Bandeau d'accueil : identité NexoraTV + accès rapides (site, réseaux,
+/// support + avis clients). Remplace l'ancien « film en avant ».
+class _InfoPanel extends ConsumerWidget {
+  const _InfoPanel();
+
+  Future<void> _open(String url) =>
+      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 340,
-      child: Stack(
-        fit: StackFit.expand,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final avis = ref.watch(avisProvider).valueOrNull ?? Avis.empty;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: nexoraGradient,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (movie.logo != null)
-            CachedNetworkImage(imageUrl: movie.logo!, fit: BoxFit.cover),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [Color(0xEE0D0E13), Color(0x330D0E13)],
+          Row(
+            children: [
+              Image.asset('assets/icon/nexora_logo.png', width: 44, height: 44),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('NexoraTV',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800)),
+                    Text('Votre univers TV, films et séries',
+                        style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  ],
+                ),
               ),
-            ),
+              if (avis.count > 0) _RatingBadge(avis: avis),
+            ],
           ),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Color(0xFF0D0E13)],
-                stops: [0.4, 1],
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _LinkButton(
+                icon: Icons.language,
+                label: 'Site officiel',
+                onTap: () => _open(Brand.site),
               ),
-            ),
+              _LinkButton(
+                icon: Icons.chat_bubble_outline,
+                label: 'WhatsApp',
+                onTap: () => _open(Brand.whatsapp),
+              ),
+              _LinkButton(
+                icon: Icons.send,
+                label: 'Telegram',
+                onTap: () => _open(Brand.telegram),
+              ),
+              _LinkButton(
+                icon: Icons.support_agent,
+                label: 'Support',
+                onTap: () => _open(Brand.contact),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(28, 0, 28, 26),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (avis.reviews.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Row(
               children: [
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 520),
-                  child: Text(
-                    movie.name,
-                    style: const TextStyle(
-                        fontSize: 30, fontWeight: FontWeight.w800),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    if (movie.year != null)
-                      Text('${movie.year}',
-                          style: TextStyle(color: Theme.of(context).hintColor)),
-                    if (movie.rating != null) ...[
-                      const SizedBox(width: 12),
-                      const Icon(Icons.star, size: 14, color: Colors.amber),
-                      const SizedBox(width: 3),
-                      Text(movie.rating!.toStringAsFixed(1)),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    FilledButton.icon(
-                      onPressed: () => pushFade(
-                        context,
-                        PlayerScreen(
-                          sourceId: sourceId,
-                          playlist: [movie],
-                          startIndex: 0,
-                        ),
-                      ),
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('Lecture'),
-                    ),
-                    const SizedBox(width: 10),
-                    OutlinedButton.icon(
-                      onPressed: () => pushFade(
-                        context,
-                        MediaDetailScreen.movie(
-                            sourceId: sourceId, movie: movie),
-                      ),
-                      icon: const Icon(Icons.info_outline),
-                      label: const Text('Infos'),
-                    ),
-                  ],
+                const Text('Avis clients',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13)),
+                const Spacer(),
+                _LinkButton(
+                  icon: Icons.reviews_outlined,
+                  label: 'Tous les avis',
+                  onTap: () => _open(Brand.avis),
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 116,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: avis.reviews.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                itemBuilder: (_, i) => _ReviewCard(review: avis.reviews[i]),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RatingBadge extends StatelessWidget {
+  const _RatingBadge({required this.avis});
+  final Avis avis;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .18),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.star, size: 14, color: Colors.amber),
+              const SizedBox(width: 3),
+              Text(
+                avis.average.toStringAsFixed(1).replaceAll('.', ','),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14),
+              ),
+            ],
+          ),
+          Text('${avis.count} avis',
+              style: const TextStyle(color: Colors.white70, fontSize: 10)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  const _ReviewCard({required this.review});
+  final Review review;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 240,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .16),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('★' * review.rating + '☆' * (5 - review.rating),
+                  style: const TextStyle(color: Colors.amber, fontSize: 11)),
+              const Spacer(),
+              Text(review.author,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Expanded(
+            child: Text(
+              review.text,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white70, fontSize: 11.5,
+                  height: 1.3),
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LinkButton extends StatelessWidget {
+  const _LinkButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: .16),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: Colors.white),
+              const SizedBox(width: 8),
+              Text(label,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -15,7 +15,8 @@ class PlaylistCache {
   static const Duration maxAge = Duration(hours: 12);
 
   /// Incrémenter à chaque changement de format.
-  static const int _schema = 8;
+  /// v9 : `plot` / `genre` sur les films (Channel).
+  static const int _schema = 9;
   static const _uMarker = 'NEXORA_U';
   static const _pMarker = 'NEXORA_P';
 

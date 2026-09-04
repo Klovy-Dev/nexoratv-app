@@ -16,6 +16,8 @@ class Channel {
     this.rating,
     this.year,
     this.addedAt,
+    this.plot,
+    this.genre,
   });
 
   /// Identifiant stable au sein d'une source (stream id Xtream, ou url hashée
@@ -43,6 +45,13 @@ class Channel {
   final int? year;
   final DateTime? addedAt;
 
+  /// Synopsis (VOD). Souvent absent de la liste `get_vod_streams` : rempli
+  /// seulement quand le panel le fournit.
+  final String? plot;
+
+  /// Genre(s) (VOD), si fourni par le panel.
+  final String? genre;
+
   String get groupOrDefault => group ?? 'Non classé';
   bool get isLive => kind == MediaKind.live;
 
@@ -59,6 +68,8 @@ class Channel {
         'rating': rating,
         'year': year,
         'addedAt': addedAt?.millisecondsSinceEpoch,
+        'plot': plot,
+        'genre': genre,
       };
 
   factory Channel.fromJson(Map<String, dynamic> json) => Channel(
@@ -79,6 +90,8 @@ class Channel {
         addedAt: json['addedAt'] == null
             ? null
             : DateTime.fromMillisecondsSinceEpoch(json['addedAt'] as int),
+        plot: json['plot'] as String?,
+        genre: json['genre'] as String?,
       );
 
   Channel copyWith({String? group}) => Channel(
@@ -94,5 +107,7 @@ class Channel {
         rating: rating,
         year: year,
         addedAt: addedAt,
+        plot: plot,
+        genre: genre,
       );
 }

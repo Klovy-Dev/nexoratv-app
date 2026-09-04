@@ -183,14 +183,18 @@ class MediaDetailScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    if ((plot ?? '').isNotEmpty) ...[
-                      const SizedBox(height: 18),
-                      Text(
-                        plot!,
-                        style: TextStyle(
-                            color: Theme.of(context).hintColor, height: 1.4),
-                      ),
-                    ],
+                    const SizedBox(height: 18),
+                    Text(
+                      (plot ?? '').trim().isNotEmpty
+                          ? plot!.trim()
+                          : 'Synopsis indisponible pour ce titre.',
+                      style: TextStyle(
+                          color: Theme.of(context).hintColor,
+                          height: 1.4,
+                          fontStyle: (plot ?? '').trim().isNotEmpty
+                              ? FontStyle.normal
+                              : FontStyle.italic),
+                    ),
                     if (series?.cast != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 10),

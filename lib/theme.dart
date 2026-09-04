@@ -11,27 +11,19 @@ const nexoraPink = Color(0xFFE8348C);
 const nexoraPurple = Color(0xFF8B5CF6);
 const nexoraBlue = Color(0xFF2D7DF6);
 
-enum AppThemeMode { dark, amoled, light }
+/// Modes de thème proposés. Un 3ᵉ thème « premium » viendra plus tard ; en
+/// attendant l'UI affiche une option « Bientôt disponible » désactivée.
+enum AppThemeMode { dark, light }
 
 ThemeData buildAppTheme(AppThemeMode mode) {
   final isLight = mode == AppThemeMode.light;
   final brightness = isLight ? Brightness.light : Brightness.dark;
 
-  final scaffold = switch (mode) {
-    AppThemeMode.dark => const Color(0xFF0D0E13),
-    AppThemeMode.amoled => Colors.black,
-    AppThemeMode.light => const Color(0xFFF4F5F8),
-  };
-  final surface = switch (mode) {
-    AppThemeMode.dark => const Color(0xFF161821),
-    AppThemeMode.amoled => const Color(0xFF0B0B0D),
-    AppThemeMode.light => Colors.white,
-  };
-  final surfaceHi = switch (mode) {
-    AppThemeMode.dark => const Color(0xFF20222E),
-    AppThemeMode.amoled => const Color(0xFF161618),
-    AppThemeMode.light => const Color(0xFFE9EAF0),
-  };
+  final scaffold =
+      isLight ? const Color(0xFFF4F5F8) : const Color(0xFF0D0E13);
+  final surface = isLight ? Colors.white : const Color(0xFF161821);
+  final surfaceHi =
+      isLight ? const Color(0xFFE9EAF0) : const Color(0xFF20222E);
 
   final scheme = ColorScheme.fromSeed(
     seedColor: nexoraPurple,

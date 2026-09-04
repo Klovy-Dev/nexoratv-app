@@ -95,14 +95,14 @@ class _AppShellState extends ConsumerState<AppShell> {
       body: Row(
         children: [
           NavigationRail(
-            extended: MediaQuery.sizeOf(context).width >= 1180,
-            minWidth: 72,
+            minWidth: 64,
+            labelType: NavigationRailLabelType.all,
             selectedIndex: _index,
             onDestinationSelected: (i) => setState(() => _index = i),
             leading: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               child: Image.asset('assets/icon/nexora_logo.png',
-                  width: 40, height: 40),
+                  width: 30, height: 30),
             ),
             trailing: Expanded(
               child: Align(
