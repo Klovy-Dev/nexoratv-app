@@ -1,9 +1,5 @@
 Nouveautés
 
-- Séries : même présentation que les films (panneau de catégories à gauche
-  sur desktop, grille de jaquettes)
-- Synopsis affiché sur les fiches détail et sous les jaquettes des grilles
-- Accueil : nouveau bandeau NexoraTV (site officiel, WhatsApp, Telegram,
-  support) à la place du film mis en avant ; les carrousels sont conservés
-- Barre latérale plus compacte
-- Thèmes : Sombre et Clair (un thème premium arrivera plus tard)
+- Ajout de source : Xtream Codes ou Adresse MAC (le lien M3U manuel n'est plus proposé à la saisie)
+- Activation par adresse MAC : chaque appareil a son adresse MAC (Sources → Activer par adresse MAC) ; une fois activée côté support, la playlist se charge automatiquement
+- La playlist activée par MAC se met à jour toute seule si le support la modifie
