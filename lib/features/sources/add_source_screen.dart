@@ -221,7 +221,6 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
 
   Widget _addBody() {
     return Column(
-      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
@@ -261,6 +260,7 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
         children: [
           TextFormField(
             controller: _name,
+            autofocus: true,
             decoration: const InputDecoration(labelText: 'Nom (facultatif)'),
           ),
           const SizedBox(height: 16),
@@ -287,6 +287,7 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
         children: [
           TextFormField(
             controller: _name,
+            autofocus: true,
             decoration: const InputDecoration(labelText: 'Nom (facultatif)'),
           ),
           const SizedBox(height: 16),
@@ -330,6 +331,7 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
         if (!_isMacEdit)
           TextFormField(
             controller: _name,
+            autofocus: true,
             decoration: const InputDecoration(labelText: 'Nom (facultatif)'),
           ),
         if (!_isMacEdit) const SizedBox(height: 16),
@@ -384,6 +386,7 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
         ..._errorBanner(),
         const SizedBox(height: 24),
         FilledButton.icon(
+          autofocus: _isMacEdit,
           onPressed: (_busy || mac == null) ? null : _activateByMac,
           icon: _busy ? _spinner() : const Icon(Icons.link),
           label: Text(_busy

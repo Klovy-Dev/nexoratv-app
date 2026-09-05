@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
@@ -66,6 +67,21 @@ class NexoraApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(mode),
       navigatorObservers: [routeObserver],
+      // Télécommande (Android TV / Fire Stick / box) : les flèches haut/bas
+      // ne sortent pas d'un champ texte par défaut → focus bloqué (impossible
+      // d'atteindre le bouton en bas d'un formulaire). On les remappe en
+      // déplacement de focus. Sans modificateur uniquement : Maj+flèche
+      // (sélection) et flèches gauche/droite (curseur) restent intactes, et
+      // il n'y a aucun champ multiligne dans l'app.
+      builder: (context, child) => Shortcuts(
+        shortcuts: const {
+          SingleActivator(LogicalKeyboardKey.arrowDown):
+              DirectionalFocusIntent(TraversalDirection.down),
+          SingleActivator(LogicalKeyboardKey.arrowUp):
+              DirectionalFocusIntent(TraversalDirection.up),
+        },
+        child: child!,
+      ),
       home: const _SplashGate(child: HomeScreen()),
     );
   }

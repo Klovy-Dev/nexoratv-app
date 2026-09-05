@@ -1,5 +1,3 @@
-Nouveauté : support télécommande
+Correctif télécommande
 
-- Les jaquettes (Films, Séries, Accueil) sont maintenant navigables à la télécommande sur Android TV, Fire Stick et box Android — un anneau met en évidence l'élément sélectionné, OK ouvre la fiche
-- Lecteur vidéo : touches avance/retour rapide et OK dédiées prises en charge
-- Focus plus visible partout dans l'app (chaînes, boutons, menus)
+- Ajout d'une source (Xtream Codes / Adresse MAC) : on peut maintenant descendre avec la télécommande depuis les champs jusqu'au bouton « Activer » / « Vérifier et ajouter ». Correction appliquée à tous les formulaires de l'app.
