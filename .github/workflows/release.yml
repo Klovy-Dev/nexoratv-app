@@ -51,6 +51,9 @@ jobs:
           # sous-dossiers, ce qui cassait le glob plat `dist/windows/*.exe` du
           # job publish (le zip, déjà à la racine, n'avait pas ce problème).
           Copy-Item "installer\Output\NexoraTV-Setup-$v.exe" .
+          # Copie au nom stable pour les liens « latest » :
+          # github.com/<repo>/releases/latest/download/NexoraTV-Setup.exe
+          Copy-Item "installer\Output\NexoraTV-Setup-$v.exe" "NexoraTV-Setup.exe"
       - name: Zip portable (secours)
         shell: pwsh
         run: |
@@ -61,7 +64,7 @@ jobs:
         with:
           name: windows
           path: |
-            NexoraTV-Setup-*.exe
+            NexoraTV-Setup*.exe
             NexoraTV-*-windows-x64.zip
 
   # ---------------------------------------------------------------- Android
@@ -116,10 +119,13 @@ jobs:
         run: |
           v="${GITHUB_REF_NAME#v}"
           mv build/app/outputs/flutter-apk/app-release.apk "NexoraTV-$v.apk"
+          # Nom stable pour les liens « latest » :
+          # github.com/<repo>/releases/latest/download/NexoraTV.apk
+          cp "NexoraTV-$v.apk" "NexoraTV.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: android
-          path: NexoraTV-*.apk
+          path: NexoraTV*.apk
 
   # ---------------------------------------------------------- Release + manifest
   publish:
