@@ -27,9 +27,8 @@ workflows:
       flutter: 3.47.2
       xcode: latest
       cocoapods: default
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.gaby.nexoratv
+      vars:
+        BUNDLE_ID: "com.gaby.nexoratv"
     scripts:
       - name: Flutter pub get
         script: flutter pub get
@@ -37,9 +36,14 @@ workflows:
         script: |
           flutter analyze
           flutter test
-      - name: Signature (certificat + profil Codemagic -> projet Xcode)
+      - name: Signature (crée certificat + profil s'ils n'existent pas)
         script: |
           keychain initialize
+          # --create : crée le certificat de distribution (clé privée générée
+          # localement) ET le provisioning profile App Store si absents.
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
           keychain add-certificates
           xcode-project use-profiles
       - name: Pods
