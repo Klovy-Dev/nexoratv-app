@@ -1,3 +1,4 @@
-Correctif télécommande
+Ajout de source simplifié + iOS
 
-- Ajout d'une source (Xtream Codes / Adresse MAC) : on peut maintenant descendre avec la télécommande depuis les champs jusqu'au bouton « Activer » / « Vérifier et ajouter ». Correction appliquée à tous les formulaires de l'app.
+- « Ajouter une source » : deux modes, **Xtream Codes** et **Playlist M3U** (URL). L'activation par adresse MAC n'est plus proposée à l'ajout (les sources déjà activées ainsi continuent de fonctionner).
+- Première version **iOS** (iPhone / iPad).
