@@ -9,7 +9,7 @@ Le binaire est déjà sur TestFlight, il n'y a que la fiche + la soumission.
 
 | Élément | Où / comment |
 |---|---|
-| **Politique de confidentialité (URL publique)** | Ajouter une page `/confidentialite` sur le site NexoraTV (Next.js). Texte prêt plus bas. |
+| **Politique de confidentialité (URL publique)** | ✅ Page créée : `https://<domaine-nexoratv>/confidentialite-application` (déployée via Vercel). C'est cette URL qui va dans le champ « Privacy Policy URL ». |
 | **URL de support** | Une page contact / WhatsApp du site NexoraTV, ou `https://nexoratv…/support` |
 | **Captures d'écran** | iPhone 6.7" (1290×2796) **et** 6.5" (1242×2688) obligatoires. iPad 12.9" (2048×2732) si tu actives iPad. Voir §4. |
 | **Compte Xtream de review** | Compte **permanent (sans expiration)** créé sur ton panel, réservé à Apple. Contenu **exclusivement légal / gratuit** (chaînes publiques, chaînes FAST, contenu libre). ⚠️ Aucun flux premium (chaînes payantes, sport PPV, plateformes SVOD) : le reviewer cherche exactement ça → rejet 5.2.3 immédiat. Noter : URL serveur, identifiant, mot de passe. |
@@ -119,7 +119,7 @@ pas de backend. Les playlists et le mot de passe Xtream restent sur l'appareil
 (trousseau iOS). Les seules requêtes réseau vont vers **les serveurs que
 l'utilisateur saisit lui-même** + le manifeste de mise à jour (désactivé sur iOS).
 
-- **URL politique de confidentialité** : ta page `/confidentialite`
+- **URL politique de confidentialité** : `https://<domaine-nexoratv>/confidentialite-application`
 
 ---
 
@@ -182,27 +182,13 @@ Bouton **« Ajouter pour examen »** puis **« Soumettre à l'examen »**.
 
 ---
 
-## Annexe — Texte politique de confidentialité (à mettre sur le site)
+## Annexe — Politique de confidentialité
 
-```
-Politique de confidentialité — NexoraTV
+✅ Déjà en ligne : **page `/confidentialite-application`** ajoutée au site NexoraTV
+(repo `nexoratv-vercel`, fichier `app/confidentialite-application/page.tsx`),
+poussée sur `main`. Vérifier que Vercel a bien déployé, puis utiliser
+`https://<domaine>/confidentialite-application` comme URL de confidentialité
+dans App Store Connect **et** Google Play.
 
-NexoraTV est un lecteur IPTV. L'application ne collecte, ne stocke et ne
-transmet aucune donnée personnelle vers nos serveurs.
-
-Données stockées sur votre appareil uniquement :
-- les playlists (URL M3U) et identifiants Xtream Codes que vous saisissez ;
-  le mot de passe Xtream est conservé dans le trousseau sécurisé du système ;
-- vos favoris, votre historique de lecture et vos réglages.
-
-Connexions réseau :
-- l'application se connecte uniquement aux serveurs que vous renseignez
-  (votre fournisseur de playlist / Xtream) pour lire vos contenus ;
-- aucune donnée d'usage, aucune analyse, aucun traceur publicitaire.
-
-Suppression :
-- désinstaller l'application efface toutes les données locales.
-
-Contact : [ton email / WhatsApp]
-Dernière mise à jour : [date]
-```
+À vérifier sur la page en ligne : la ligne « Contact » renvoie vers `/contact`
+du site — s'assurer que cette page fonctionne.
