@@ -3,17 +3,19 @@
 #
 # ─── À FAIRE UNE SEULE FOIS (tout depuis le web, sans Mac) ────────────────────
 #  1. App Store Connect > Users and Access > Integrations > App Store Connect API
-#       → générer une clé, rôle « App Manager » (ou Admin)
-#       → noter : Issuer ID, Key ID, télécharger le fichier AuthKey_XXXX.p8
-#  2. developer.apple.com > Identifiers : enregistrer le bundle ID com.gaby.nexoratv
-#  3. App Store Connect > Apps > (+) : créer l'app (bundle com.gaby.nexoratv, SKU nexoratv)
+#       → clé rôle « App Manager » ; noter Issuer ID + Key ID, télécharger le .p8
+#  2. developer.apple.com > Identifiers : bundle ID com.gaby.nexoratv
+#  3. App Store Connect > Apps > (+) : créer l'app (bundle com.gaby.nexoratv)
 #  4. Codemagic > Team settings > Integrations > Developer Portal > Connect
-#       → coller name=AppStoreConnect, Issuer ID, Key ID, .p8
-#  5. App Store Connect > l'app > TestFlight > Internal Testing : groupe « Internes »
+#       → name=AppStoreConnect, Issuer ID, Key ID, .p8
+#  5. Codemagic > Team settings > Global variables and secrets :
+#       groupe « ios_signing » → variable CERTIFICATE_PRIVATE_KEY (Secure)
+#       = clé RSA privée PEM (générée hors CI, réutilisée à chaque build pour
+#         que le même certificat de distribution soit repris).
+#  6. App Store Connect > l'app > TestFlight > Internal Testing : groupe « Internes »
 #
-# Le certificat de distribution + le provisioning profile sont créés
-# automatiquement au 1er build (app-store-connect ... --create).
-# Ensuite : bouton « Start new build ». Le .ipa part tout seul sur TestFlight.
+# Au 1er build : le certificat de distribution (à partir de CERTIFICATE_PRIVATE_KEY)
+# + le provisioning profile App Store sont créés. Builds suivants : réutilisés.
 # ─────────────────────────────────────────────────────────────────────────────
 
 workflows:
@@ -27,6 +29,8 @@ workflows:
       flutter: 3.47.2
       xcode: latest
       cocoapods: default
+      groups:
+        - ios_signing            # fournit CERTIFICATE_PRIVATE_KEY
       vars:
         BUNDLE_ID: "com.gaby.nexoratv"
     scripts:
@@ -36,13 +40,14 @@ workflows:
         script: |
           flutter analyze
           flutter test
-      - name: Signature (crée certificat + profil s'ils n'existent pas)
+      - name: Signature (certificat + profil, créés au besoin)
         script: |
           keychain initialize
-          # --create : crée le certificat de distribution (clé privée générée
-          # localement) ET le provisioning profile App Store si absents.
+          # Reprend le certificat de distribution lié à CERTIFICATE_PRIVATE_KEY,
+          # ou le crée (avec cette clé) s'il n'existe pas encore. Idem profil.
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
+            --certificate-key "@env:CERTIFICATE_PRIVATE_KEY" \
             --create
           keychain add-certificates
           xcode-project use-profiles
