@@ -12,7 +12,7 @@ Le binaire est déjà sur TestFlight, il n'y a que la fiche + la soumission.
 | **Politique de confidentialité (URL publique)** | Ajouter une page `/confidentialite` sur le site NexoraTV (Next.js). Texte prêt plus bas. |
 | **URL de support** | Une page contact / WhatsApp du site NexoraTV, ou `https://nexoratv…/support` |
 | **Captures d'écran** | iPhone 6.7" (1290×2796) **et** 6.5" (1242×2688) obligatoires. iPad 12.9" (2048×2732) si tu actives iPad. Voir §4. |
-| **Playlist de test légale** | Pour le reviewer : `https://iptv-org.github.io/iptv/index.m3u` (chaînes publiques gratuites). |
+| **Compte Xtream de review** | Compte **permanent (sans expiration)** créé sur ton panel, réservé à Apple. Contenu **exclusivement légal / gratuit** (chaînes publiques, chaînes FAST, contenu libre). ⚠️ Aucun flux premium (chaînes payantes, sport PPV, plateformes SVOD) : le reviewer cherche exactement ça → rejet 5.2.3 immédiat. Noter : URL serveur, identifiant, mot de passe. |
 
 ---
 
@@ -30,21 +30,19 @@ Le binaire est déjà sur TestFlight, il n'y a que la fiche + la soumission.
 
 ### Texte promotionnel (170 car., modifiable sans review)
 ```
-Lisez vos playlists M3U et comptes Xtream Codes : TV en direct, films et séries, favoris, reprise de lecture. Vous fournissez vos propres contenus.
+Lisez votre compte Xtream Codes : TV en direct, films et séries, favoris, reprise de lecture. Vous fournissez votre propre source.
 ```
 
 ### Description
 ```
-NexoraTV est un lecteur IPTV générique. Ajoutez votre propre playlist M3U
-(via URL) ou votre compte Xtream Codes, et NexoraTV organise vos contenus :
-télévision en direct, films et séries.
+NexoraTV est un lecteur IPTV générique. Connectez votre compte Xtream Codes
+et NexoraTV organise vos contenus : télévision en direct, films et séries.
 
-L'application ne fournit aucune chaîne ni aucun contenu : vous utilisez vos
-propres sources.
+L'application ne fournit aucune chaîne ni aucun contenu : vous utilisez votre
+propre source.
 
 FONCTIONNALITÉS
-• Playlists M3U par URL et comptes Xtream Codes
-• Un lien get.php Xtream est reconnu automatiquement (TV / Films / Séries séparés)
+• Comptes Xtream Codes (TV / Films / Séries séparés automatiquement)
 • Accueil : reprise de lecture + sections TV, Films, Séries
 • Plusieurs sources commutables et éditables
 • Navigation par catégorie, recherche par section et recherche globale
@@ -67,7 +65,7 @@ Première version iOS de NexoraTV.
 
 ### Mots-clés (100 car., séparés par des virgules, sans espaces superflus)
 ```
-iptv,m3u,xtream,playlist,lecteur,tv,streaming,chaines,films,series,player,vod
+iptv,xtream,xtream codes,lecteur,tv,streaming,chaines,films,series,player,vod,m3u
 ```
 
 ### URL marketing (optionnel)
@@ -135,21 +133,24 @@ l'utilisateur saisit lui-même** + le manifeste de mise à jour (désactivé sur
 ## 8. Notes pour l'App Review (champ « Notes »)
 
 ```
-NexoraTV est un lecteur multimédia générique pour playlists M3U et comptes
-Xtream Codes. L'application ne fournit, n'héberge et ne diffuse aucun contenu :
-l'utilisateur ajoute sa propre source.
-
-Aucun compte n'est nécessaire pour tester l'app.
-
-Pour tester avec des chaînes publiques gratuites :
-1. Ouvrir l'app → Ajouter une source → Playlist M3U (URL)
-2. Coller : https://iptv-org.github.io/iptv/index.m3u
-3. Valider → les chaînes publiques apparaissent, la lecture fonctionne
-
-Cette liste de test provient du projet open-source iptv-org et ne contient que
-des flux publics et légaux.
+NexoraTV est un lecteur multimédia générique pour comptes Xtream Codes et
+playlists IPTV. L'application ne fournit, n'héberge et ne diffuse aucun
+contenu : l'utilisateur configure sa propre source.
 
 L'app est équivalente à VLC ou Infuse : un lecteur, pas un fournisseur de contenu.
+
+COMPTE DE TEST (Xtream Codes)
+Adresse du serveur : http://<TON_SERVEUR>:<PORT>
+Identifiant : <REVIEW_USERNAME>
+Mot de passe : <REVIEW_PASSWORD>
+
+Étapes :
+1. Ouvrir l'app → Ajouter une source → onglet « Xtream Codes »
+2. Saisir l'adresse du serveur, l'identifiant et le mot de passe ci-dessus
+3. « Vérifier et ajouter » → les chaînes apparaissent, la lecture fonctionne
+4. Sections TV / Films / Séries navigables depuis l'accueil
+
+Ce compte donne accès à des chaînes gratuites et publiques uniquement.
 ```
 
 ---
