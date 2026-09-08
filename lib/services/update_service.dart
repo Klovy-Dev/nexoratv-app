@@ -58,6 +58,9 @@ class UpdateService {
   /// sinon `null`. Ne lève pas : renvoie `null` en cas d'erreur réseau.
   Future<UpdateInfo?> check(String manifestUrl) async {
     if (manifestUrl.trim().isEmpty) return null;
+    // iOS : les mises à jour passent par l'App Store / TestFlight, pas par
+    // notre manifeste. On n'affiche donc aucune bannière de MAJ interne.
+    if (Platform.isIOS) return null;
     final current = await currentVersion();
     try {
       final res = await _dio.get<dynamic>(
