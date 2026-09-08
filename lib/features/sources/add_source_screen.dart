@@ -11,7 +11,10 @@ import '../../state/sources_provider.dart';
 
 /// Mode d'ajout d'une nouvelle source (l'édition, elle, reste dans le mode
 /// de la source existante — voir [_isLegacyM3u] / [_isMacEdit]).
-enum _AddMode { xtream, mac }
+///
+/// L'activation par adresse MAC n'est plus proposée à l'ajout : elle reste
+/// gérée uniquement pour les sources déjà activées ainsi (voir [_isMacEdit]).
+enum _AddMode { xtream, m3u }
 
 class AddSourceScreen extends ConsumerStatefulWidget {
   const AddSourceScreen({super.key, this.existing});
@@ -64,7 +67,7 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
       _username.text = e.username ?? '';
       _password.text = e.password ?? '';
     }
-    if (!_isEdit || _isMacEdit) {
+    if (_isMacEdit) {
       DeviceMac.getOrCreate().then((mac) {
         if (mounted) setState(() => _deviceMac = mac);
       });
@@ -121,8 +124,9 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
     }
   }
 
-  /// Édition d'une source M3U historique (URL/EPG visibles) — compat.
-  Future<void> _submitLegacyM3u() async {
+  /// Ajout / édition d'une source « playlist M3U » (URL directe ou lien
+  /// `get.php` Xtream, converti automatiquement).
+  Future<void> _submitM3u() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _busy = true;
@@ -130,8 +134,8 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
     });
     final name = _name.text.trim().isEmpty ? 'Playlist' : _name.text.trim();
     final source = PlaylistSource(
-      id: widget.existing!.id,
-      createdAt: widget.existing!.createdAt,
+      id: widget.existing?.id,
+      createdAt: widget.existing?.createdAt,
       name: name,
       kind: SourceKind.m3uUrl,
       m3uUrl: _m3uUrl.text.trim(),
@@ -139,8 +143,13 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
     ).upgradedToXtreamIfPossible();
     try {
       await ref.read(playlistServiceProvider).validate(source);
-      await ref.read(sourcesProvider.notifier).editSource(source);
-      ref.invalidate(playlistForSourceProvider(source.id));
+      final notifier = ref.read(sourcesProvider.notifier);
+      if (_isEdit) {
+        await notifier.editSource(source);
+        ref.invalidate(playlistForSourceProvider(source.id));
+      } else {
+        await notifier.add(source);
+      }
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -233,9 +242,9 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
                 icon: Icon(Icons.vpn_key),
               ),
               ButtonSegment(
-                value: _AddMode.mac,
-                label: Text('Adresse MAC'),
-                icon: Icon(Icons.router_outlined),
+                value: _AddMode.m3u,
+                label: Text('Playlist M3U'),
+                icon: Icon(Icons.link),
               ),
             ],
             selected: {_mode},
@@ -246,7 +255,7 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
           ),
         ),
         Expanded(
-          child: _mode == _AddMode.xtream ? _xtreamForm() : _macForm(),
+          child: _mode == _AddMode.xtream ? _xtreamForm() : _m3uForm(),
         ),
       ],
     );
@@ -297,7 +306,7 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
             autocorrect: false,
             decoration: const InputDecoration(
               labelText: 'URL de la playlist M3U',
-              hintText: 'http://exemple.com/get.php?username=…',
+              hintText: 'https://exemple.com/playlist.m3u',
             ),
             validator: (v) => (v == null || !v.trim().startsWith('http'))
                 ? 'URL invalide'
@@ -314,9 +323,11 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
           ..._errorBanner(),
           const SizedBox(height: 24),
           FilledButton.icon(
-            onPressed: _busy ? null : _submitLegacyM3u,
+            onPressed: _busy ? null : _submitM3u,
             icon: _busy ? _spinner() : const Icon(Icons.check),
-            label: Text(_busy ? 'Vérification…' : 'Enregistrer'),
+            label: Text(_busy
+                ? 'Vérification…'
+                : (_isEdit ? 'Enregistrer' : 'Vérifier et ajouter')),
           ),
         ],
       ),

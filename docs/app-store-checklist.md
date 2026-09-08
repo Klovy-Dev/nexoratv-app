@@ -9,10 +9,10 @@ Le binaire est déjà sur TestFlight, il n'y a que la fiche + la soumission.
 
 | Élément | Où / comment |
 |---|---|
-| **Politique de confidentialité (URL publique)** | ✅ Page créée : `https://<domaine-nexoratv>/confidentialite-application` (déployée via Vercel). C'est cette URL qui va dans le champ « Privacy Policy URL ». |
-| **URL de support** | Une page contact / WhatsApp du site NexoraTV, ou `https://nexoratv…/support` |
+| **Politique de confidentialité (URL publique)** | ✅ Page créée : `https://nexoratv.fr/confidentialite-application` (déployée via Vercel). C'est cette URL qui va dans le champ « Privacy Policy URL ». |
+| **URL de support** | `https://nexoratv.fr/contact` |
 | **Captures d'écran** | iPhone 6.7" (1290×2796) **et** 6.5" (1242×2688) obligatoires. iPad 12.9" (2048×2732) si tu actives iPad. Voir §4. |
-| **Compte Xtream de review** | Compte **permanent (sans expiration)** créé sur ton panel, réservé à Apple. Contenu **exclusivement légal / gratuit** (chaînes publiques, chaînes FAST, contenu libre). ⚠️ Aucun flux premium (chaînes payantes, sport PPV, plateformes SVOD) : le reviewer cherche exactement ça → rejet 5.2.3 immédiat. Noter : URL serveur, identifiant, mot de passe. |
+| **Playlist de review** | ✅ Prête : `https://nexoratv.fr/review.m3u` (fichier `public/review.m3u` du repo site). Chaînes FAST gratuites + films Blender CC-BY. Le reviewer l'ajoute via **Ajouter une source → Playlist M3U**. Rien à maintenir, aucun compte. |
 
 ---
 
@@ -30,19 +30,21 @@ Le binaire est déjà sur TestFlight, il n'y a que la fiche + la soumission.
 
 ### Texte promotionnel (170 car., modifiable sans review)
 ```
-Lisez votre compte Xtream Codes : TV en direct, films et séries, favoris, reprise de lecture. Vous fournissez votre propre source.
+Lisez vos playlists M3U et comptes Xtream Codes : TV en direct, films et séries, favoris, reprise de lecture. Vous fournissez votre propre source.
 ```
 
 ### Description
 ```
-NexoraTV est un lecteur IPTV générique. Connectez votre compte Xtream Codes
-et NexoraTV organise vos contenus : télévision en direct, films et séries.
+NexoraTV est un lecteur IPTV générique. Ajoutez votre playlist M3U (URL) ou
+votre compte Xtream Codes, et NexoraTV organise vos contenus : télévision en
+direct, films et séries.
 
 L'application ne fournit aucune chaîne ni aucun contenu : vous utilisez votre
 propre source.
 
 FONCTIONNALITÉS
-• Comptes Xtream Codes (TV / Films / Séries séparés automatiquement)
+• Playlists M3U (URL) et comptes Xtream Codes
+• Xtream : TV / Films / Séries séparés automatiquement
 • Accueil : reprise de lecture + sections TV, Films, Séries
 • Plusieurs sources commutables et éditables
 • Navigation par catégorie, recherche par section et recherche globale
@@ -86,11 +88,12 @@ Laisser vide ou mettre le site NexoraTV.
 
 ## 4. Captures d'écran
 
-Le plus simple sans Mac : lance l'app iOS via **TestFlight sur ton iPhone**, fais
-des captures (Volume haut + latéral), recadre si besoin.
+Le plus simple sans Mac : lance l'app iOS via **TestFlight sur ton iPhone**,
+ajoute la source `https://nexoratv.fr/review.m3u`, fais des captures
+(Volume haut + bouton latéral), recadre si besoin.
 
-- **iPhone 6.7"** : au moins 3, idéalement 5 (Accueil, grille Films, lecteur,
-  détail série, recherche)
+- **iPhone 6.7"** : au moins 3, idéalement 5 (Accueil, liste TV, lecteur
+  plein écran, recherche, écran « Ajouter une source »)
 - **iPhone 6.5"** : Apple accepte de réutiliser les mêmes visuels redimensionnés,
   mais il faut fournir le format. Si ton iPhone est un modèle 6.7", tu peux
   générer le 6.5" avec un simple redimensionnement (ratio identique 19.5:9).
@@ -119,7 +122,7 @@ pas de backend. Les playlists et le mot de passe Xtream restent sur l'appareil
 (trousseau iOS). Les seules requêtes réseau vont vers **les serveurs que
 l'utilisateur saisit lui-même** + le manifeste de mise à jour (désactivé sur iOS).
 
-- **URL politique de confidentialité** : `https://<domaine-nexoratv>/confidentialite-application`
+- **URL politique de confidentialité** : `https://nexoratv.fr/confidentialite-application`
 
 ---
 
@@ -133,24 +136,25 @@ l'utilisateur saisit lui-même** + le manifeste de mise à jour (désactivé sur
 ## 8. Notes pour l'App Review (champ « Notes »)
 
 ```
-NexoraTV est un lecteur multimédia générique pour comptes Xtream Codes et
-playlists IPTV. L'application ne fournit, n'héberge et ne diffuse aucun
-contenu : l'utilisateur configure sa propre source.
+NexoraTV est un lecteur multimédia générique pour playlists M3U et comptes
+Xtream Codes. L'application ne fournit, n'héberge et ne diffuse aucun contenu :
+l'utilisateur configure sa propre source. Équivalent de VLC ou Infuse.
 
-L'app est équivalente à VLC ou Infuse : un lecteur, pas un fournisseur de contenu.
+POUR TESTER
+1. Ouvrir l'app → « Ajouter une source » → onglet « Playlist M3U »
+2. Coller l'URL : https://nexoratv.fr/review.m3u
+3. « Vérifier et ajouter »
+4. L'onglet TV liste les chaînes ; appuyer sur une chaîne lance la lecture
 
-COMPTE DE TEST (Xtream Codes)
-Adresse du serveur : http://<TON_SERVEUR>:<PORT>
-Identifiant : <REVIEW_USERNAME>
-Mot de passe : <REVIEW_PASSWORD>
+Cette playlist de démonstration ne contient que des flux légaux et gratuits :
+chaînes d'information publiques (DW, France 24), Red Bull TV, et des films
+libres de droits de la Blender Foundation (licence Creative Commons).
 
-Étapes :
-1. Ouvrir l'app → Ajouter une source → onglet « Xtream Codes »
-2. Saisir l'adresse du serveur, l'identifiant et le mot de passe ci-dessus
-3. « Vérifier et ajouter » → les chaînes apparaissent, la lecture fonctionne
-4. Sections TV / Films / Séries navigables depuis l'accueil
-
-Ce compte donne accès à des chaînes gratuites et publiques uniquement.
+À propos des onglets Films et Séries : ils se remplissent à partir d'un
+compte Xtream de l'utilisateur (catalogue à la demande). Avec une simple
+playlist M3U comme celle de test, ces onglets affichent « Aucun film sur ce
+compte » — c'est le comportement normal, au même titre que la bibliothèque
+vide de VLC ou Infuse tant qu'aucune source de VOD n'est ajoutée.
 ```
 
 ---
