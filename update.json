@@ -1,7 +1,7 @@
 {
-  "version": "1.3.1",
-  "notes": "Correctif télécommande\n\n- Ajout d'une source (Xtream Codes / Adresse MAC) : on peut maintenant descendre avec la télécommande depuis les champs jusqu'au bouton « Activer » / « Vérifier et ajouter ». Correction appliquée à tous les formulaires de l'app.\n",
-  "windows_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.3.1/NexoraTV-Setup-1.3.1.exe",
-  "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.3.1/NexoraTV-1.3.1.apk",
+  "version": "1.3.3",
+  "notes": "Navigation télécommande revue\n\n- Formulaires (ajout d'une source Xtream / M3U) : plus de clavier qui s'ouvre tout seul, les champs s'enchaînent de haut en bas sans repartir en haut, le bouton reste toujours atteignable à la télécommande\n- On voit beaucoup mieux où on est : anneau blanc net sur les boutons, rangée mise en évidence dans les listes de chaînes et de catégories\n- Lecteur : touches OK / Retour / Lecture-Pause / chaîne +/- / avance rapide prises en charge sur davantage de télécommandes ; après l'écran « Pistes » les touches répondent encore\n- L'app est reconnue comme application Android TV / Fire TV (visible sur l'écran d'accueil, bannière dédiée)\n",
+  "windows_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.3.3/NexoraTV-Setup-1.3.3.exe",
+  "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.3.3/NexoraTV-1.3.3.apk",
   "mandatory": false
 }
