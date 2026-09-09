@@ -13,6 +13,7 @@ import '../../state/settings_provider.dart';
 import '../../state/watch_history_provider.dart';
 import '../../widgets/nav.dart';
 import '../../widgets/pin_dialog.dart';
+import '../../widgets/tv_text_field.dart';
 import '../channels/channel_tile.dart';
 import '../detail/media_detail_screen.dart';
 import '../player/player_screen.dart';
@@ -244,8 +245,9 @@ class _CatalogBrowserState extends ConsumerState<CatalogBrowser> {
           child: Row(
             children: [
               Expanded(
-                child: TextField(
+                child: TvTextField(
                   controller: _searchController,
+                  onChanged: _onSearchChanged,
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search),
                     hintText: 'Rechercher…',
@@ -262,7 +264,6 @@ class _CatalogBrowserState extends ConsumerState<CatalogBrowser> {
                             ),
                     ),
                   ),
-                  onChanged: _onSearchChanged,
                 ),
               ),
               if (widget.allowGrid)

@@ -1,6 +1,6 @@
-Saisie au clavier revue (Android TV / Fire TV / box)
+Fire TV / Android TV — saisie et navigation
 
-- Ajout d'une source (Xtream / M3U) : le clavier ne s'ouvre plus tout seul quand on arrive sur un champ à la télécommande — on appuie sur OK (ou on touche le champ) pour écrire
-- « Suivant » descend au champ suivant sans ouvrir le clavier ; OK le rouvre à chaque champ — fini le blocage après le premier champ
-- Quelle que soit la façon de sortir d'un champ, la navigation à la télécommande reprend la main normalement
+- Le clavier ne s'ouvre plus tout seul quand la télécommande arrive sur un champ : ça vaut pour l'ajout de source (Xtream / M3U) ET pour la recherche dans TV / Films / Séries et la recherche globale. On appuie sur OK (ou on touche) pour écrire, « Suivant » passe au champ suivant, OK rouvre le clavier — plus de blocage
+- Bouton Recherche ajouté dans la barre latérale : la recherche globale est enfin accessible à la télécommande
+- Bannière Android TV / Fire TV en vraie image (dégradé Nexora + logo) : l'app s'affiche correctement dans le menu du téléviseur
 - Saisie tactile inchangée : toucher un champ ouvre le clavier directement

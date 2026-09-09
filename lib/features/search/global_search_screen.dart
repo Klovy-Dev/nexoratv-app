@@ -8,6 +8,7 @@ import '../../models/series.dart';
 import '../../services/playlist_service.dart';
 import '../../state/providers.dart';
 import '../../widgets/nav.dart';
+import '../../widgets/tv_text_field.dart';
 import '../catalog/poster_card.dart';
 import '../channels/channel_tile.dart';
 import '../detail/media_detail_screen.dart';
@@ -104,17 +105,20 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: TextField(
+        title: TvTextField(
           controller: _controller,
-          autofocus: true,
+          isLast: true,
+          onChanged: _onChanged,
+          onSubmitted: _commit,
           decoration: const InputDecoration(
             hintText: 'Rechercher partout…',
             border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
             filled: false,
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(vertical: 8),
           ),
-          textInputAction: TextInputAction.search,
-          onChanged: _onChanged,
-          onSubmitted: _commit,
         ),
         actions: [
           if (_controller.text.isNotEmpty)

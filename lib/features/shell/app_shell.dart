@@ -125,11 +125,21 @@ class _AppShellState extends ConsumerState<AppShell> {
                 alignment: Alignment.bottomCenter,
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: IconButton(
-                    tooltip: 'Paramètres',
-                    icon: const Icon(Icons.settings_outlined),
-                    onPressed: () =>
-                        pushFade(context, const SettingsScreen()),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Rechercher',
+                        icon: const Icon(Icons.search),
+                        onPressed: _openSearch,
+                      ),
+                      IconButton(
+                        tooltip: 'Paramètres',
+                        icon: const Icon(Icons.settings_outlined),
+                        onPressed: () =>
+                            pushFade(context, const SettingsScreen()),
+                      ),
+                    ],
                   ),
                 ),
               ),
