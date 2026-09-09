@@ -36,6 +36,28 @@ ThemeData buildAppTheme(AppThemeMode mode) {
     surfaceContainerHighest: surfaceHi,
   );
 
+  // Anneau blanc franc quand un bouton a le focus D-pad : sur Fire TV / Android
+  // TV, l'overlay de teinte par défaut est presque invisible, on ne sait pas
+  // où on est. Appliqué à tous les types de boutons Material ci-dessous.
+  final focusRing = WidgetStateProperty.resolveWith<BorderSide?>((states) {
+    if (states.contains(WidgetState.focused)) {
+      return BorderSide(
+        color: isLight ? nexoraPurple : Colors.white,
+        width: 2.5,
+      );
+    }
+    return null;
+  });
+  final focusOverlay = WidgetStateProperty.resolveWith<Color?>((states) {
+    if (states.contains(WidgetState.focused)) {
+      return nexoraPurple.withValues(alpha: .28);
+    }
+    if (states.contains(WidgetState.pressed)) {
+      return nexoraPurple.withValues(alpha: .20);
+    }
+    return null;
+  });
+
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
@@ -99,7 +121,16 @@ ThemeData buildAppTheme(AppThemeMode mode) {
         backgroundColor: nexoraPurple,
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+      ).copyWith(side: focusRing, overlayColor: focusOverlay),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: ButtonStyle(side: focusRing, overlayColor: focusOverlay),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: ButtonStyle(side: focusRing, overlayColor: focusOverlay),
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: ButtonStyle(overlayColor: focusOverlay),
     ),
   );
 }

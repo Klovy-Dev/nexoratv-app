@@ -38,6 +38,16 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
   final _username = TextEditingController();
   final _password = TextEditingController();
 
+  // Nœuds de focus explicites : la télécommande (Android TV / Fire TV / box)
+  // enchaîne les champs via ces nœuds. On évite ainsi `nextFocus()` de l'IME,
+  // qui rebouclait vers le premier champ (« Suivant » renvoyait tout en haut).
+  final _nameNode = FocusNode();
+  final _m3uUrlNode = FocusNode();
+  final _epgUrlNode = FocusNode();
+  final _hostNode = FocusNode();
+  final _usernameNode = FocusNode();
+  final _passwordNode = FocusNode();
+
   bool _busy = false;
   String? _error;
   String? _deviceMac;
@@ -78,6 +88,16 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
   void dispose() {
     for (final c in [_name, _m3uUrl, _epgUrl, _host, _username, _password]) {
       c.dispose();
+    }
+    for (final n in [
+      _nameNode,
+      _m3uUrlNode,
+      _epgUrlNode,
+      _hostNode,
+      _usernameNode,
+      _passwordNode,
+    ]) {
+      n.dispose();
     }
     super.dispose();
   }
@@ -264,26 +284,32 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
   Widget _xtreamForm() {
     return Form(
       key: _formKey,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          TextFormField(
-            controller: _name,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: 'Nom (facultatif)'),
-          ),
-          const SizedBox(height: 16),
-          ..._xtreamFields(),
-          ..._errorBanner(),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: _busy ? null : _submitXtream,
-            icon: _busy ? _spinner() : const Icon(Icons.check),
-            label: Text(_busy
-                ? 'Vérification…'
-                : (_isEdit ? 'Enregistrer' : 'Vérifier et ajouter')),
-          ),
-        ],
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              controller: _name,
+              focusNode: _nameNode,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => _hostNode.requestFocus(),
+              decoration: const InputDecoration(labelText: 'Nom (facultatif)'),
+            ),
+            const SizedBox(height: 16),
+            ..._xtreamFields(),
+            ..._errorBanner(),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: _busy ? null : _submitXtream,
+              icon: _busy ? _spinner() : const Icon(Icons.check),
+              label: Text(_busy
+                  ? 'Vérification…'
+                  : (_isEdit ? 'Enregistrer' : 'Vérifier et ajouter')),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -291,58 +317,77 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
   Widget _m3uForm() {
     return Form(
       key: _formKey,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          TextFormField(
-            controller: _name,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: 'Nom (facultatif)'),
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _m3uUrl,
-            keyboardType: TextInputType.url,
-            autocorrect: false,
-            decoration: const InputDecoration(
-              labelText: 'URL de la playlist M3U',
-              hintText: 'https://exemple.com/playlist.m3u',
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              controller: _name,
+              focusNode: _nameNode,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => _m3uUrlNode.requestFocus(),
+              decoration: const InputDecoration(labelText: 'Nom (facultatif)'),
             ),
-            validator: (v) => (v == null || !v.trim().startsWith('http'))
-                ? 'URL invalide'
-                : null,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _epgUrl,
-            keyboardType: TextInputType.url,
-            autocorrect: false,
-            decoration:
-                const InputDecoration(labelText: 'URL EPG XMLTV (facultatif)'),
-          ),
-          ..._errorBanner(),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: _busy ? null : _submitM3u,
-            icon: _busy ? _spinner() : const Icon(Icons.check),
-            label: Text(_busy
-                ? 'Vérification…'
-                : (_isEdit ? 'Enregistrer' : 'Vérifier et ajouter')),
-          ),
-        ],
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _m3uUrl,
+              focusNode: _m3uUrlNode,
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => _epgUrlNode.requestFocus(),
+              decoration: const InputDecoration(
+                labelText: 'URL de la playlist M3U',
+                hintText: 'https://exemple.com/playlist.m3u',
+              ),
+              validator: (v) => (v == null || !v.trim().startsWith('http'))
+                  ? 'URL invalide'
+                  : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _epgUrl,
+              focusNode: _epgUrlNode,
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              textInputAction: TextInputAction.done,
+              onEditingComplete: () {
+                _epgUrlNode.unfocus();
+                if (!_busy) _submitM3u();
+              },
+              decoration:
+                  const InputDecoration(labelText: 'URL EPG XMLTV (facultatif)'),
+            ),
+            ..._errorBanner(),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: _busy ? null : _submitM3u,
+              icon: _busy ? _spinner() : const Icon(Icons.check),
+              label: Text(_busy
+                  ? 'Vérification…'
+                  : (_isEdit ? 'Enregistrer' : 'Vérifier et ajouter')),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _macForm() {
     final mac = _deviceMac;
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
         if (!_isMacEdit)
           TextFormField(
             controller: _name,
-            autofocus: true,
+            focusNode: _nameNode,
+            textInputAction: TextInputAction.done,
             decoration: const InputDecoration(labelText: 'Nom (facultatif)'),
           ),
         if (!_isMacEdit) const SizedBox(height: 16),
@@ -404,7 +449,8 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
               ? 'Activation…'
               : (_isMacEdit ? 'Réactiver' : 'Activer')),
         ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -433,8 +479,11 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
   List<Widget> _xtreamFields() => [
         TextFormField(
           controller: _host,
+          focusNode: _hostNode,
           keyboardType: TextInputType.url,
           autocorrect: false,
+          textInputAction: TextInputAction.next,
+          onEditingComplete: () => _usernameNode.requestFocus(),
           decoration: const InputDecoration(
             labelText: 'Adresse du serveur',
             hintText: 'http://exemple.com:8080',
@@ -445,7 +494,10 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
         const SizedBox(height: 16),
         TextFormField(
           controller: _username,
+          focusNode: _usernameNode,
           autocorrect: false,
+          textInputAction: TextInputAction.next,
+          onEditingComplete: () => _passwordNode.requestFocus(),
           decoration: const InputDecoration(labelText: 'Identifiant'),
           validator: (v) =>
               (v == null || v.trim().isEmpty) ? 'Champ requis' : null,
@@ -453,7 +505,13 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
         const SizedBox(height: 16),
         TextFormField(
           controller: _password,
+          focusNode: _passwordNode,
           obscureText: true,
+          textInputAction: TextInputAction.done,
+          onEditingComplete: () {
+            _passwordNode.unfocus();
+            if (!_busy) _submitXtream();
+          },
           decoration: const InputDecoration(labelText: 'Mot de passe'),
           validator: (v) =>
               (v == null || v.trim().isEmpty) ? 'Champ requis' : null,

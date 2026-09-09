@@ -59,3 +59,77 @@ Border? tvFocusBorder(BuildContext context, bool focused, {double width = 3}) {
   if (!focused) return null;
   return Border.all(color: Theme.of(context).colorScheme.primary, width: width);
 }
+
+/// Rangée (tuile de liste) navigable à la télécommande avec une surbrillance
+/// franche, lisible en usage « 10 pieds » : fond plein teinté + barre d'accent
+/// à gauche + léger agrandissement quand l'élément a le focus (D-pad) ou le
+/// survol souris. OK/Entrée/Espace déclenchent [onTap].
+class TvFocusableRow extends StatefulWidget {
+  const TvFocusableRow({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.autofocus = false,
+    this.focusNode,
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final bool autofocus;
+  final FocusNode? focusNode;
+
+  @override
+  State<TvFocusableRow> createState() => _TvFocusableRowState();
+}
+
+class _TvFocusableRowState extends State<TvFocusableRow> {
+  bool _active = false;
+
+  void _set(bool v) {
+    if (_active != v) setState(() => _active = v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return FocusableActionDetector(
+      focusNode: widget.focusNode,
+      autofocus: widget.autofocus,
+      enabled: widget.onTap != null,
+      onShowFocusHighlight: _set,
+      onShowHoverHighlight: _set,
+      mouseCursor: widget.onTap == null
+          ? MouseCursor.defer
+          : SystemMouseCursors.click,
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) {
+          widget.onTap?.call();
+          return null;
+        }),
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          transform: _active
+              ? (Matrix4.identity()..scaleByDouble(1.015, 1.015, 1.015, 1))
+              : Matrix4.identity(),
+          transformAlignment: Alignment.centerLeft,
+          decoration: BoxDecoration(
+            color: _active
+                ? scheme.primary.withValues(alpha: .20)
+                : Colors.transparent,
+            border: Border(
+              left: BorderSide(
+                color: _active ? scheme.primary : Colors.transparent,
+                width: 3,
+              ),
+            ),
+          ),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}

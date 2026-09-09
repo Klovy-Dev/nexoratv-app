@@ -623,7 +623,12 @@ Future<void> _editText(
     context: context,
     builder: (_) => AlertDialog(
       title: Text(title),
-      content: TextField(controller: controller, autofocus: true),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (v) => Navigator.pop(context, v.trim()),
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),

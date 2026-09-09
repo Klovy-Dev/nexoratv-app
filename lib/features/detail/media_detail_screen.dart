@@ -151,12 +151,14 @@ class MediaDetailScreen extends ConsumerWidget {
                           fontSize: 21, fontWeight: FontWeight.w700, height: 1.2),
                     ),
                     const SizedBox(height: 14),
-                    Wrap(
+                    FocusTraversalGroup(
+                      child: Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         FilledButton.icon(
+                          autofocus: true,
                           onPressed: () => _play(context, ref),
                           icon: const Icon(Icons.play_arrow),
                           label: Text(isSeries ? 'Regarder' : 'Lecture'),
@@ -182,6 +184,7 @@ class MediaDetailScreen extends ConsumerWidget {
                           color: inList ? nexoraPurple : null,
                         ),
                       ],
+                    ),
                     ),
                     const SizedBox(height: 18),
                     Text(

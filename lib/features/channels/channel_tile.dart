@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/channel.dart';
 import '../../state/epg_provider.dart';
+import '../../widgets/tv_focusable.dart';
 
 class ChannelTile extends ConsumerWidget {
   const ChannelTile({
@@ -13,6 +14,7 @@ class ChannelTile extends ConsumerWidget {
     required this.onToggleFavorite,
     required this.onTap,
     this.showFavorite = true,
+    this.autofocus = false,
   });
 
   final Channel channel;
@@ -20,6 +22,7 @@ class ChannelTile extends ConsumerWidget {
   final bool showFavorite;
   final VoidCallback onToggleFavorite;
   final VoidCallback onTap;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -32,23 +35,27 @@ class ChannelTile extends ConsumerWidget {
       }
     }
 
-    return ListTile(
+    return TvFocusableRow(
       onTap: onTap,
-      leading: SizedBox(width: 40, height: 40, child: _Logo(url: channel.logo)),
-      title: Text(channel.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: subtitle == null
-          ? null
-          : Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-      trailing: showFavorite
-          ? IconButton(
-              visualDensity: VisualDensity.compact,
-              icon: Icon(
-                isFavorite ? Icons.star : Icons.star_border,
-                color: isFavorite ? Colors.amber : null,
-              ),
-              onPressed: onToggleFavorite,
-            )
-          : const Icon(Icons.chevron_right),
+      autofocus: autofocus,
+      child: ListTile(
+        leading:
+            SizedBox(width: 40, height: 40, child: _Logo(url: channel.logo)),
+        title: Text(channel.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: subtitle == null
+            ? null
+            : Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: showFavorite
+            ? IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  isFavorite ? Icons.star : Icons.star_border,
+                  color: isFavorite ? Colors.amber : null,
+                ),
+                onPressed: onToggleFavorite,
+              )
+            : const Icon(Icons.chevron_right),
+      ),
     );
   }
 }

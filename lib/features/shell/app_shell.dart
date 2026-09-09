@@ -71,7 +71,21 @@ class _AppShellState extends ConsumerState<AppShell> {
           child: loading ? const LinearProgressIndicator(minHeight: 2) : null,
         ),
         const Divider(height: 1),
-        Expanded(child: IndexedStack(index: _index, children: pages)),
+        // Amorce le focus au démarrage pour que la télécommande (D-pad) ait un
+        // point de départ, et empêche le focus d'atterrir sur un onglet masqué
+        // (IndexedStack garde tous les onglets montés et positionnés).
+        Expanded(
+          child: FocusScope(
+            autofocus: true,
+            child: IndexedStack(
+              index: _index,
+              children: [
+                for (var i = 0; i < pages.length; i++)
+                  ExcludeFocus(excluding: i != _index, child: pages[i]),
+              ],
+            ),
+          ),
+        ),
       ],
     );
 

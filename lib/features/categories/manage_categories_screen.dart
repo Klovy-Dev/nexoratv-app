@@ -129,6 +129,8 @@ class _ManageCategoriesScreenState
         content: TextField(
           controller: c,
           autofocus: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (v) => Navigator.pop(context, v.trim()),
           decoration:
               const InputDecoration(hintText: 'Laisser vide = nom original'),
         ),

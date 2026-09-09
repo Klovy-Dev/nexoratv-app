@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/tv_focusable.dart';
+
 /// Groupes virtuels (clés spéciales de catégorie).
 const String kFavoritesGroup = '__favorites__';
 const String kRecentGroup = '__recent__';
@@ -138,13 +140,15 @@ class _CategoryPanelState extends State<CategoryPanel> {
 
   Widget _row(BuildContext c, IconData icon, String label, int? count, bool sel,
           VoidCallback onTap) =>
-      ListTile(
-        leading: Icon(icon, size: 20),
-        title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: count == null ? null : Text('$count'),
-        selected: sel,
-        selectedTileColor:
-            Theme.of(c).colorScheme.primary.withValues(alpha: .14),
+      TvFocusableRow(
         onTap: onTap,
+        child: ListTile(
+          leading: Icon(icon, size: 20),
+          title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+          trailing: count == null ? null : Text('$count'),
+          selected: sel,
+          selectedTileColor:
+              Theme.of(c).colorScheme.primary.withValues(alpha: .14),
+        ),
       );
 }

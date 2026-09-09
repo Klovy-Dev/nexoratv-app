@@ -283,10 +283,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    // On accepte l'appui simple ET la répétition (appui maintenu) : utile
+    // pour l'avance/retour rapide au D-pad. `KeyUpEvent` est ignoré.
+    final repeat = event is KeyRepeatEvent;
+    if (event is! KeyDownEvent && !repeat) return KeyEventResult.ignored;
     final key = event.logicalKey;
     final digit = _digit(key);
     if (digit != null) {
+      if (repeat) return KeyEventResult.handled;
       _numberInput = (_numberInput + digit).substring(
           0, (_numberInput.length + 1).clamp(0, 4));
       setState(() {});
@@ -294,12 +298,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
       _numberTimer = Timer(const Duration(milliseconds: 1300), _jumpToNumber);
       return KeyEventResult.handled;
     }
+    // Zap (chaîne suivante / précédente) : pas de répétition sur appui
+    // maintenu, sinon on enchaîne les chaînes en rafale.
     if (key == LogicalKeyboardKey.arrowUp ||
-        key == LogicalKeyboardKey.channelUp) {
-      _zap(-1);
+        key == LogicalKeyboardKey.channelUp ||
+        key == LogicalKeyboardKey.mediaTrackPrevious) {
+      if (!repeat) _zap(-1);
     } else if (key == LogicalKeyboardKey.arrowDown ||
-        key == LogicalKeyboardKey.channelDown) {
-      _zap(1);
+        key == LogicalKeyboardKey.channelDown ||
+        key == LogicalKeyboardKey.mediaTrackNext) {
+      if (!repeat) _zap(1);
     } else if ((key == LogicalKeyboardKey.arrowRight ||
             key == LogicalKeyboardKey.mediaFastForward) &&
         _isVod) {
@@ -310,8 +318,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
         _isVod) {
       _player.seek(_player.state.position - const Duration(seconds: 10));
       _showControls();
+    } else if (repeat) {
+      // Aucune autre action ne se répète sur appui maintenu.
+      return KeyEventResult.handled;
     } else if (key == LogicalKeyboardKey.space ||
         key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.gameButtonA ||
         key == LogicalKeyboardKey.mediaPlayPause) {
       // `select` = touche OK d'une télécommande (Android TV / Fire Stick) :
       // affiche les commandes si elles sont masquées, sinon lecture/pause.
@@ -321,6 +333,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
         _player.playOrPause();
         _showControls();
       }
+    } else if (key == LogicalKeyboardKey.mediaPlay) {
+      _player.play();
+      _showControls();
+    } else if (key == LogicalKeyboardKey.mediaPause) {
+      _player.pause();
+      _showControls();
+    } else if (key == LogicalKeyboardKey.mediaStop) {
+      _exit();
+    } else if (key == LogicalKeyboardKey.contextMenu ||
+        key == LogicalKeyboardKey.tv ||
+        key == LogicalKeyboardKey.info) {
+      _openTracksSheet();
     } else if (key == LogicalKeyboardKey.keyF) {
       _toggleFullscreen();
     } else if (key == LogicalKeyboardKey.keyP) {
@@ -331,7 +355,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
     } else if (key == LogicalKeyboardKey.enter && _numberInput.isNotEmpty) {
       _numberTimer?.cancel();
       _jumpToNumber();
-    } else if (key == LogicalKeyboardKey.escape) {
+    } else if (key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.goBack ||
+        key == LogicalKeyboardKey.browserBack ||
+        key == LogicalKeyboardKey.gameButtonB) {
+      // Touche « Retour » de la télécommande : quitte le plein écran d'abord
+      // (desktop), sinon ferme le lecteur.
       _isFullscreen ? _toggleFullscreen() : _exit();
     } else {
       return KeyEventResult.ignored;
@@ -348,9 +377,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
     return null;
   }
 
-  void _openTracksSheet() {
+  Future<void> _openTracksSheet() async {
     _showControls();
-    showModalBottomSheet<void>(
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF14151A),
       builder: (_) => _TracksSheet(
@@ -363,6 +392,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
         onRate: (r) => _player.setRate(r),
       ),
     );
+    // Sans ça, après fermeture de la feuille le focus reste perdu et plus
+    // aucune touche de la télécommande ne répond.
+    if (mounted) _focusNode.requestFocus();
   }
 
   void _pauseForBackground() {
@@ -484,58 +516,63 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
                                 fontWeight: FontWeight.bold)),
                       ),
                     ),
-                  if (_pip)
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: IgnorePointer(
-                        ignoring: !_controlsVisible,
-                        child: AnimatedOpacity(
-                          opacity: _controlsVisible ? 1 : 0,
-                          duration: const Duration(milliseconds: 150),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.close_fullscreen,
-                                    color: Colors.white),
-                                onPressed: _togglePip,
+                  // Les commandes ne prennent jamais le focus D-pad : sinon
+                  // les flèches naviguent entre les boutons au lieu de zapper
+                  // / avancer, et `_onKey` ne reçoit plus rien. Elles restent
+                  // cliquables à la souris / au tactile.
+                  ExcludeFocus(
+                    child: _pip
+                        ? Align(
+                            alignment: Alignment.topRight,
+                            child: IgnorePointer(
+                              ignoring: !_controlsVisible,
+                              child: AnimatedOpacity(
+                                opacity: _controlsVisible ? 1 : 0,
+                                duration: const Duration(milliseconds: 150),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.close_fullscreen,
+                                          color: Colors.white),
+                                      onPressed: _togglePip,
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.close,
+                                          color: Colors.white),
+                                      onPressed: _exit,
+                                    ),
+                                  ],
+                                ),
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.close,
-                                    color: Colors.white),
-                                onPressed: _exit,
-                              ),
-                            ],
+                            ),
+                          )
+                        : _ControlsBar(
+                            visible: _controlsVisible,
+                            player: _player,
+                            title: _current.name,
+                            subtitle: subtitle,
+                            playing: _playing,
+                            isVod: _isVod,
+                            isFullscreen: _isFullscreen,
+                            showFullscreen: _isDesktop,
+                            showPip: _isDesktop,
+                            canZap: widget.playlist.length > 1,
+                            hasTracks: _isVod ||
+                                _tracks.audio.length > 2 ||
+                                _tracks.subtitle.length > 2,
+                            onBack: _exit,
+                            onPlayPause: () {
+                              _player.playOrPause();
+                              _showControls();
+                            },
+                            onPrev: () => _zap(-1),
+                            onNext: () => _zap(1),
+                            onFullscreen: _toggleFullscreen,
+                            onPip: _togglePip,
+                            onTracks: _openTracksSheet,
                           ),
-                        ),
-                      ),
-                    )
-                  else
-                    _ControlsBar(
-                      visible: _controlsVisible,
-                      player: _player,
-                      title: _current.name,
-                      subtitle: subtitle,
-                      playing: _playing,
-                      isVod: _isVod,
-                      isFullscreen: _isFullscreen,
-                      showFullscreen: _isDesktop,
-                      showPip: _isDesktop,
-                      canZap: widget.playlist.length > 1,
-                      hasTracks: _isVod ||
-                          _tracks.audio.length > 2 ||
-                          _tracks.subtitle.length > 2,
-                      onBack: _exit,
-                      onPlayPause: () {
-                        _player.playOrPause();
-                        _showControls();
-                      },
-                      onPrev: () => _zap(-1),
-                      onNext: () => _zap(1),
-                      onFullscreen: _toggleFullscreen,
-                      onPip: _togglePip,
-                      onTracks: _openTracksSheet,
-                    ),
+                  ),
                 ],
               ),
             ),
@@ -620,10 +657,20 @@ class _TracksSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Le 1ᵉʳ élément actionnable prend le focus pour que la télécommande
+    // puisse naviguer la feuille dès son ouverture.
+    var firstDone = false;
+    bool takeFocus() {
+      if (firstDone) return false;
+      firstDone = true;
+      return true;
+    }
+
     return SafeArea(
-      child: ListView(
-        shrinkWrap: true,
-        children: [
+      child: FocusTraversalGroup(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
           if (showSpeed) ...[
             const _SheetHeader('Vitesse de lecture'),
             Padding(
@@ -633,6 +680,7 @@ class _TracksSheet extends StatelessWidget {
                 children: [
                   for (final s in _speeds)
                     ChoiceChip(
+                      autofocus: takeFocus(),
                       label: Text(s == 1.0 ? 'Normal' : '$s×'),
                       selected: (rate - s).abs() < 0.01,
                       onSelected: (_) {
@@ -649,6 +697,7 @@ class _TracksSheet extends StatelessWidget {
             for (final a in tracks.audio)
               ListTile(
                 dense: true,
+                autofocus: takeFocus(),
                 leading: Icon(a.id == current.audio.id
                     ? Icons.radio_button_checked
                     : Icons.radio_button_unchecked),
@@ -674,7 +723,8 @@ class _TracksSheet extends StatelessWidget {
                 },
               ),
           ],
-        ],
+          ],
+        ),
       ),
     );
   }
