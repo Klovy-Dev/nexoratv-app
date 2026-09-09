@@ -6,13 +6,13 @@
     "mandatory": false
   },
   "android": {
-    "version": "1.3.7",
-    "url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/android-v1.3.7/NexoraTV-1.3.7.apk",
-    "notes": "Accueil, lecteur et navigation télécommande revus (Fire TV Stick)\n\n- Nouvel accueil : le bandeau violet (site / WhatsApp / avis) est remplacé par un bandeau de films ET séries mis en avant qui défile toutes les 20 s (affiche, note, « Lecture » / « Voir »)\n- Stabilité Fire TV Stick : mémoire mieux maîtrisée (cache image plafonné, affiches à la bonne taille) — vise les fermetures brutales « retour au menu du téléviseur »\n- Retour depuis le contenu → barre latérale ; Retour deux fois → quitte l'app ; flèche gauche au bord → barre latérale ; flèche droite sur la barre → revient au contenu\n- Lecteur : quand les commandes sont affichées, le D-pad navigue entre les boutons (Pistes, Retour, précédent/suivant) ; masquées, les flèches zappent / avancent comme avant\n- Nouveau Paramètres → Diagnostic : dernier plantage enregistré (à copier)",
+    "version": "1.3.8",
+    "url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/android-v1.3.8/NexoraTV-1.3.8.apk",
+    "notes": "Correctif crash Fire TV Stick\n\n- Moteur de rendu Skia forcé sur Android (Impeller désactivé) : c'était la cause des écrans blancs suivis de la fermeture brutale sur les Fire TV Stick et vieux boîtiers, au chargement des rangées de films de l'accueil\n- Affiches allégées : découpe sans surcouche GPU, décodage à petite taille, moins de rangées sur l'accueil — moins de mémoire, plus fluide\n- (inclut aussi 1.3.7 : accueil films/séries qui défile, Retour → barre latérale, lecteur navigable au D-pad, Paramètres → Diagnostic)",
     "mandatory": false
   },
   "version": "1.3.3",
   "windows_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.3.3/NexoraTV-Setup-1.3.3.exe",
-  "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/android-v1.3.7/NexoraTV-1.3.7.apk",
+  "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/android-v1.3.8/NexoraTV-1.3.8.apk",
   "mandatory": false
 }
