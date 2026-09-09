@@ -6,13 +6,13 @@
     "mandatory": false
   },
   "android": {
-    "version": "1.3.3",
-    "url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.3.3/NexoraTV-1.3.3.apk",
-    "notes": "Navigation télécommande revue\n\n- Formulaires (ajout d'une source Xtream / M3U) : plus de clavier qui s'ouvre tout seul, les champs s'enchaînent de haut en bas sans repartir en haut, le bouton reste toujours atteignable à la télécommande\n- On voit beaucoup mieux où on est : anneau blanc net sur les boutons, rangée mise en évidence dans les listes de chaînes et de catégories\n- Lecteur : touches OK / Retour / Lecture-Pause / chaîne +/- / avance rapide prises en charge sur davantage de télécommandes ; après l'écran « Pistes » les touches répondent encore\n- L'app est reconnue comme application Android TV / Fire TV (visible sur l'écran d'accueil, bannière dédiée)\n",
+    "version": "1.3.5",
+    "url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/android-v1.3.5/NexoraTV-1.3.5.apk",
+    "notes": "Fire TV / Android TV — saisie et navigation\n\n- Le clavier ne s'ouvre plus tout seul quand la télécommande arrive sur un champ : ça vaut pour l'ajout de source (Xtream / M3U) ET pour la recherche dans TV / Films / Séries et la recherche globale. On appuie sur OK (ou on touche) pour écrire, « Suivant » passe au champ suivant, OK rouvre le clavier — plus de blocage\n- Bouton Recherche ajouté dans la barre latérale : la recherche globale est enfin accessible à la télécommande\n- Bannière Android TV / Fire TV en vraie image (dégradé Nexora + logo) : l'app s'affiche correctement dans le menu du téléviseur\n- Saisie tactile inchangée : toucher un champ ouvre le clavier directement",
     "mandatory": false
   },
   "version": "1.3.3",
   "windows_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.3.3/NexoraTV-Setup-1.3.3.exe",
-  "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.3.3/NexoraTV-1.3.3.apk",
+  "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/android-v1.3.5/NexoraTV-1.3.5.apk",
   "mandatory": false
 }
