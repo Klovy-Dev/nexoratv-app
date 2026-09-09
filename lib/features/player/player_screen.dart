@@ -44,7 +44,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
     ),
   );
   late final VideoController _controller = VideoController(_player);
-  final _focusNode = FocusNode();
+  final _focusNode = FocusNode(debugLabel: 'player-root');
+  // Bouton lecture/pause : reçoit le focus quand les commandes s'affichent,
+  // pour que le D-pad puisse ensuite naviguer entre les boutons.
+  final _playPauseFocusNode = FocusNode(debugLabel: 'player-playpause');
   final _subs = <StreamSubscription>[];
   AppLifecycleListener? _lifecycle;
 
@@ -217,15 +220,24 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
 
   void _showControls() {
     if (!_controlsVisible) setState(() => _controlsVisible = true);
+    // Le focus part sur les commandes : le D-pad navigue alors entre les
+    // boutons (Pistes, Retour, précédent/suivant…) au lieu de zapper.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _controlsVisible) _playPauseFocusNode.requestFocus();
+    });
     _scheduleHide();
+  }
+
+  void _hideControls() {
+    if (_controlsVisible) setState(() => _controlsVisible = false);
+    // Le handler global (`_onKey`) reprend la main : flèches = zap / avance.
+    _focusNode.requestFocus();
   }
 
   void _scheduleHide() {
     _hideTimer?.cancel();
     _hideTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && _playing && _error == null) {
-        setState(() => _controlsVisible = false);
-      }
+      if (mounted && _playing && _error == null) _hideControls();
     });
   }
 
@@ -288,6 +300,34 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
     final repeat = event is KeyRepeatEvent;
     if (event is! KeyDownEvent && !repeat) return KeyEventResult.ignored;
     final key = event.logicalKey;
+
+    // Commandes affichées : le D-pad doit naviguer ENTRE les boutons, pas
+    // zapper / avancer. On laisse donc passer flèches + OK au système de
+    // focus, et « Retour » masque simplement les commandes.
+    if (_controlsVisible && !repeat) {
+      final isNav = key == LogicalKeyboardKey.arrowUp ||
+          key == LogicalKeyboardKey.arrowDown ||
+          key == LogicalKeyboardKey.arrowLeft ||
+          key == LogicalKeyboardKey.arrowRight ||
+          key == LogicalKeyboardKey.select ||
+          key == LogicalKeyboardKey.enter ||
+          key == LogicalKeyboardKey.space ||
+          key == LogicalKeyboardKey.gameButtonA;
+      if (isNav) {
+        _scheduleHide();
+        return KeyEventResult.ignored;
+      }
+      if (key == LogicalKeyboardKey.escape ||
+          key == LogicalKeyboardKey.goBack ||
+          key == LogicalKeyboardKey.browserBack ||
+          key == LogicalKeyboardKey.gameButtonB) {
+        _hideControls();
+        return KeyEventResult.handled;
+      }
+      // Les touches média dédiées (channelUp/Down, mediaXxx…) continuent
+      // vers le traitement commun ci-dessous.
+    }
+
     final digit = _digit(key);
     if (digit != null) {
       if (repeat) return KeyEventResult.handled;
@@ -298,25 +338,34 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
       _numberTimer = Timer(const Duration(milliseconds: 1300), _jumpToNumber);
       return KeyEventResult.handled;
     }
-    // Zap (chaîne suivante / précédente) : pas de répétition sur appui
-    // maintenu, sinon on enchaîne les chaînes en rafale.
+    // Commandes masquées : le D-pad zappe / avance, PUIS affiche les
+    // commandes — un 2ᵉ appui navigue alors entre les boutons.
+    // (appui maintenu : pas de répétition du zap, sinon rafale de chaînes.)
     if (key == LogicalKeyboardKey.arrowUp ||
         key == LogicalKeyboardKey.channelUp ||
         key == LogicalKeyboardKey.mediaTrackPrevious) {
-      if (!repeat) _zap(-1);
+      if (!repeat) {
+        _zap(-1);
+        _showControls();
+      }
     } else if (key == LogicalKeyboardKey.arrowDown ||
         key == LogicalKeyboardKey.channelDown ||
         key == LogicalKeyboardKey.mediaTrackNext) {
-      if (!repeat) _zap(1);
-    } else if ((key == LogicalKeyboardKey.arrowRight ||
-            key == LogicalKeyboardKey.mediaFastForward) &&
-        _isVod) {
-      _player.seek(_player.state.position + const Duration(seconds: 10));
+      if (!repeat) {
+        _zap(1);
+        _showControls();
+      }
+    } else if (key == LogicalKeyboardKey.arrowRight ||
+        key == LogicalKeyboardKey.mediaFastForward) {
+      if (_isVod) {
+        _player.seek(_player.state.position + const Duration(seconds: 10));
+      }
       _showControls();
-    } else if ((key == LogicalKeyboardKey.arrowLeft ||
-            key == LogicalKeyboardKey.mediaRewind) &&
-        _isVod) {
-      _player.seek(_player.state.position - const Duration(seconds: 10));
+    } else if (key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.mediaRewind) {
+      if (_isVod) {
+        _player.seek(_player.state.position - const Duration(seconds: 10));
+      }
       _showControls();
     } else if (repeat) {
       // Aucune autre action ne se répète sur appui maintenu.
@@ -393,8 +442,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
       ),
     );
     // Sans ça, après fermeture de la feuille le focus reste perdu et plus
-    // aucune touche de la télécommande ne répond.
-    if (mounted) _focusNode.requestFocus();
+    // aucune touche de la télécommande ne répond. On réaffiche les commandes
+    // (focus sur lecture/pause) pour repartir d'un état clair.
+    if (mounted) _showControls();
   }
 
   void _pauseForBackground() {
@@ -431,6 +481,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
       s.cancel();
     }
     _focusNode.dispose();
+    _playPauseFocusNode.dispose();
     // Coupe le son immédiatement, puis libère le lecteur (dispose est async).
     try {
       _player.pause();
@@ -516,63 +567,67 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
                                 fontWeight: FontWeight.bold)),
                       ),
                     ),
-                  // Les commandes ne prennent jamais le focus D-pad : sinon
-                  // les flèches naviguent entre les boutons au lieu de zapper
-                  // / avancer, et `_onKey` ne reçoit plus rien. Elles restent
-                  // cliquables à la souris / au tactile.
-                  ExcludeFocus(
-                    child: _pip
-                        ? Align(
-                            alignment: Alignment.topRight,
-                            child: IgnorePointer(
-                              ignoring: !_controlsVisible,
-                              child: AnimatedOpacity(
-                                opacity: _controlsVisible ? 1 : 0,
-                                duration: const Duration(milliseconds: 150),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.close_fullscreen,
-                                          color: Colors.white),
-                                      onPressed: _togglePip,
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.close,
-                                          color: Colors.white),
-                                      onPressed: _exit,
-                                    ),
-                                  ],
+                  // Commandes masquées : on les sort du parcours de focus,
+                  // pour que `_onKey` reçoive les flèches (zap / avance).
+                  // Affichées : elles deviennent navigables au D-pad.
+                  if (_pip)
+                    ExcludeFocus(
+                      child: Align(
+                        alignment: Alignment.topRight,
+                        child: IgnorePointer(
+                          ignoring: !_controlsVisible,
+                          child: AnimatedOpacity(
+                            opacity: _controlsVisible ? 1 : 0,
+                            duration: const Duration(milliseconds: 150),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.close_fullscreen,
+                                      color: Colors.white),
+                                  onPressed: _togglePip,
                                 ),
-                              ),
+                                IconButton(
+                                  icon: const Icon(Icons.close,
+                                      color: Colors.white),
+                                  onPressed: _exit,
+                                ),
+                              ],
                             ),
-                          )
-                        : _ControlsBar(
-                            visible: _controlsVisible,
-                            player: _player,
-                            title: _current.name,
-                            subtitle: subtitle,
-                            playing: _playing,
-                            isVod: _isVod,
-                            isFullscreen: _isFullscreen,
-                            showFullscreen: _isDesktop,
-                            showPip: _isDesktop,
-                            canZap: widget.playlist.length > 1,
-                            hasTracks: _isVod ||
-                                _tracks.audio.length > 2 ||
-                                _tracks.subtitle.length > 2,
-                            onBack: _exit,
-                            onPlayPause: () {
-                              _player.playOrPause();
-                              _showControls();
-                            },
-                            onPrev: () => _zap(-1),
-                            onNext: () => _zap(1),
-                            onFullscreen: _toggleFullscreen,
-                            onPip: _togglePip,
-                            onTracks: _openTracksSheet,
                           ),
-                  ),
+                        ),
+                      ),
+                    )
+                  else
+                    ExcludeFocus(
+                      excluding: !_controlsVisible,
+                      child: _ControlsBar(
+                        visible: _controlsVisible,
+                        player: _player,
+                        playPauseFocusNode: _playPauseFocusNode,
+                        title: _current.name,
+                        subtitle: subtitle,
+                        playing: _playing,
+                        isVod: _isVod,
+                        isFullscreen: _isFullscreen,
+                        showFullscreen: _isDesktop,
+                        showPip: _isDesktop,
+                        canZap: widget.playlist.length > 1,
+                        hasTracks: _isVod ||
+                            _tracks.audio.length > 2 ||
+                            _tracks.subtitle.length > 2,
+                        onBack: _exit,
+                        onPlayPause: () {
+                          _player.playOrPause();
+                          _showControls();
+                        },
+                        onPrev: () => _zap(-1),
+                        onNext: () => _zap(1),
+                        onFullscreen: _toggleFullscreen,
+                        onPip: _togglePip,
+                        onTracks: _openTracksSheet,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -759,6 +814,7 @@ class _ControlsBar extends StatelessWidget {
   const _ControlsBar({
     required this.visible,
     required this.player,
+    required this.playPauseFocusNode,
     required this.title,
     required this.subtitle,
     required this.playing,
@@ -779,6 +835,7 @@ class _ControlsBar extends StatelessWidget {
 
   final bool visible;
   final Player player;
+  final FocusNode playPauseFocusNode;
   final String title;
   final String subtitle;
   final bool playing;
@@ -859,7 +916,9 @@ class _ControlsBar extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (isVod) _SeekRow(player: player),
+                  // Le StreamBuilder de position repeint ~4×/s : on ne le
+                  // monte que quand les commandes sont visibles.
+                  if (isVod && visible) _SeekRow(player: player),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -871,6 +930,7 @@ class _ControlsBar extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       IconButton.filled(
+                        focusNode: playPauseFocusNode,
                         icon: Icon(playing ? Icons.pause : Icons.play_arrow),
                         onPressed: onPlayPause,
                       ),

@@ -1,20 +1,17 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../brand.dart';
 import '../../models/channel.dart';
 import '../../models/series.dart';
-import '../../services/avis_service.dart';
 import '../../services/playlist_service.dart';
-import '../../state/avis_provider.dart';
 import '../../state/channels_provider.dart';
 import '../../state/favorites_provider.dart';
 import '../../state/settings_provider.dart';
 import '../../state/sources_provider.dart';
 import '../../state/watch_history_provider.dart';
-import '../../theme.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/nav.dart';
 import '../../widgets/tv_focusable.dart';
@@ -75,10 +72,17 @@ class _Dashboard extends ConsumerWidget {
 
     final recentMovies = playlist.recentMovies(20);
     final recentSeries = playlist.recentSeries(12);
+    final featured = _featuredItems(
+      recentMovies,
+      playlist.movies,
+      recentSeries,
+      playlist.series,
+    );
 
     return ListView(
       children: [
-        const _InfoPanel(),
+        if (featured.isNotEmpty)
+          _FeaturedHero(items: featured, sourceId: sourceId),
         if (resume.isNotEmpty)
           _Rail(
             title: 'Reprendre',
@@ -172,229 +176,268 @@ class _Dashboard extends ConsumerWidget {
     );
   }
 
+  /// Films **et** séries mis en avant dans le bandeau qui défile : ceux qui
+  /// ont une affiche et une note correcte, en priorité les récents,
+  /// interclassés film/série. Limité à 8 (une seule image en mémoire à la
+  /// fois côté bandeau — léger pour Fire TV Stick).
+  List<_Featured> _featuredItems(
+    List<Channel> recentMovies,
+    List<Channel> allMovies,
+    List<Series> recentSeries,
+    List<Series> allSeries,
+  ) {
+    List<T> pick<T>(
+      List<T> recent,
+      List<T> all,
+      bool Function(T) good,
+      String Function(T) id,
+    ) {
+      final seen = <String>{};
+      final out = <T>[];
+      for (final e in [...recent, ...all]) {
+        if (good(e) && seen.add(id(e))) out.add(e);
+        if (out.length >= 5) break;
+      }
+      if (out.isEmpty) {
+        for (final e in [...recent, ...all]) {
+          if (seen.add(id(e))) out.add(e);
+          if (out.length >= 5) break;
+        }
+      }
+      return out;
+    }
+
+    final movies = pick<Channel>(
+      recentMovies,
+      allMovies,
+      (m) => (m.logo?.isNotEmpty ?? false) && (m.rating ?? 0) >= 6,
+      (m) => m.id,
+    );
+    final series = pick<Series>(
+      recentSeries,
+      allSeries,
+      (s) => (s.cover?.isNotEmpty ?? false) && (s.rating ?? 0) >= 6,
+      (s) => s.id,
+    );
+
+    final out = <_Featured>[];
+    for (var i = 0; out.length < 8 && (i < movies.length || i < series.length); i++) {
+      if (i < movies.length) out.add(_Featured.movie(movies[i]));
+      if (out.length < 8 && i < series.length) out.add(_Featured.series(series[i]));
+    }
+    return out;
+  }
 }
 
-/// Bandeau d'accueil : identité NexoraTV + accès rapides (site, réseaux,
-/// support + avis clients). Remplace l'ancien « film en avant ».
-class _InfoPanel extends ConsumerWidget {
-  const _InfoPanel();
+/// Un élément du bandeau d'accueil : un film ou une série.
+class _Featured {
+  const _Featured.movie(Channel this.movie) : series = null;
+  const _Featured.series(Series this.series) : movie = null;
 
-  Future<void> _open(String url) =>
-      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  final Channel? movie;
+  final Series? series;
+
+  bool get isSeries => series != null;
+  String get name => movie?.name ?? series!.name;
+  String? get image => movie?.logo ?? series!.cover;
+  int? get year => movie?.year ?? series!.year;
+  double? get rating => movie?.rating ?? series!.rating;
+  String get id => movie?.id ?? series!.id;
+}
+
+/// Bandeau d'accueil : les films et séries mis en avant défilent (fondu
+/// enchaîné toutes les 20 s). Une seule affiche est décodée à la fois —
+/// pensé pour les appareils pauvres en RAM (Fire TV Stick).
+class _FeaturedHero extends StatefulWidget {
+  const _FeaturedHero({required this.items, required this.sourceId});
+  final List<_Featured> items;
+  final String sourceId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final avis = ref.watch(avisProvider).valueOrNull ?? Avis.empty;
+  State<_FeaturedHero> createState() => _FeaturedHeroState();
+}
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: nexoraGradient,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+class _FeaturedHeroState extends State<_FeaturedHero> {
+  int _i = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.items.length > 1) {
+      _timer = Timer.periodic(const Duration(seconds: 20), (_) {
+        if (mounted) setState(() => _i = (_i + 1) % widget.items.length);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _open(_Featured item) => pushFade(
+        context,
+        item.isSeries
+            ? MediaDetailScreen.series(
+                sourceId: widget.sourceId, series: item.series!)
+            : MediaDetailScreen.movie(
+                sourceId: widget.sourceId, movie: item.movie!),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final height = wide ? 340.0 : 260.0;
+    final item = widget.items[_i.clamp(0, widget.items.length - 1)];
+
+    return SizedBox(
+      height: height,
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          Row(
-            children: [
-              Image.asset('assets/icon/nexora_logo.png', width: 44, height: 44),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 400),
+            child: CachedNetworkImage(
+              key: ValueKey(item.id),
+              imageUrl: item.image ?? '',
+              fit: BoxFit.cover,
+              memCacheWidth: 720,
+              placeholder: (_, _) =>
+                  Container(color: scheme.surfaceContainerHighest),
+              errorWidget: (_, _, _) =>
+                  Container(color: scheme.surfaceContainerHighest),
+            ),
+          ),
+          // Voiles pour la lisibilité du texte.
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [Color(0xE6000000), Color(0x22000000)],
+              ),
+            ),
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, scheme.surface],
+                stops: const [0.45, 1],
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(wide ? 32 : 20, 0, 20, wide ? 26 : 18),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text('NexoraTV',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800)),
-                    Text('Votre univers TV, films et séries',
-                        style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        item.isSeries ? 'SÉRIE' : 'FILM',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .6,
+                        ),
+                      ),
+                    ),
+                    if (item.year != null) ...[
+                      const SizedBox(width: 10),
+                      Text('${item.year}',
+                          style: const TextStyle(color: Colors.white70)),
+                    ],
+                    if (item.rating != null) ...[
+                      const SizedBox(width: 10),
+                      const Icon(Icons.star, size: 14, color: Colors.amber),
+                      const SizedBox(width: 3),
+                      Text(item.rating!.toStringAsFixed(1),
+                          style: const TextStyle(color: Colors.white)),
+                    ],
                   ],
                 ),
-              ),
-              if (avis.count > 0) _RatingBadge(avis: avis),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _LinkButton(
-                icon: Icons.language,
-                label: 'Site officiel',
-                onTap: () => _open(Brand.site),
-              ),
-              _LinkButton(
-                icon: Icons.chat_bubble_outline,
-                label: 'WhatsApp',
-                onTap: () => _open(Brand.whatsapp),
-              ),
-              _LinkButton(
-                icon: Icons.send,
-                label: 'Telegram',
-                onTap: () => _open(Brand.telegram),
-              ),
-              _LinkButton(
-                icon: Icons.support_agent,
-                label: 'Support',
-                onTap: () => _open(Brand.contact),
-              ),
-            ],
-          ),
-          if (avis.reviews.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Text('Avis clients',
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: Text(
+                    item.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13)),
-                const Spacer(),
-                _LinkButton(
-                  icon: Icons.reviews_outlined,
-                  label: 'Tous les avis',
-                  onTap: () => _open(Brand.avis),
+                      fontSize: wide ? 30 : 22,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    FilledButton.icon(
+                      autofocus: true,
+                      onPressed: () {
+                        if (item.isSeries) {
+                          _open(item);
+                        } else {
+                          pushFade(
+                            context,
+                            PlayerScreen(
+                              sourceId: widget.sourceId,
+                              playlist: [item.movie!],
+                              startIndex: 0,
+                            ),
+                          );
+                        }
+                      },
+                      icon: Icon(
+                          item.isSeries ? Icons.visibility : Icons.play_arrow),
+                      label: Text(item.isSeries ? 'Voir' : 'Lecture'),
+                    ),
+                    if (!item.isSeries) ...[
+                      const SizedBox(width: 10),
+                      OutlinedButton.icon(
+                        onPressed: () => _open(item),
+                        icon: const Icon(Icons.info_outline),
+                        label: const Text('Infos'),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    for (var j = 0; j < widget.items.length; j++)
+                      Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        width: j == _i ? 18 : 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: j == _i
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: .4),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 116,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: avis.reviews.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (_, i) => _ReviewCard(review: avis.reviews[i]),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _RatingBadge extends StatelessWidget {
-  const _RatingBadge({required this.avis});
-  final Avis avis;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .18),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.star, size: 14, color: Colors.amber),
-              const SizedBox(width: 3),
-              Text(
-                avis.average.toStringAsFixed(1).replaceAll('.', ','),
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14),
-              ),
-            ],
-          ),
-          Text('${avis.count} avis',
-              style: const TextStyle(color: Colors.white70, fontSize: 10)),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.review});
-  final Review review;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 240,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .16),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text('★' * review.rating + '☆' * (5 - review.rating),
-                  style: const TextStyle(color: Colors.amber, fontSize: 11)),
-              const Spacer(),
-              Text(review.author,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Expanded(
-            child: Text(
-              review.text,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white70, fontSize: 11.5,
-                  height: 1.3),
-            ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _LinkButton extends StatelessWidget {
-  const _LinkButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return TvFocusable(
-      onTap: onTap,
-      builder: (context, focused, hovered) => AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: focused || hovered ? .30 : .16),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: focused ? Colors.white : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: Colors.white),
-            const SizedBox(width: 8),
-            Text(label,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600)),
-          ],
-        ),
       ),
     );
   }
@@ -456,12 +499,14 @@ class _MoviePoster extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final progress = () {
-      for (final e in ref.watch(watchHistoryProvider).value ?? const []) {
+    // `.select` : ce poster ne se reconstruit que si SA progression change,
+    // pas à chaque écriture dans l'historique (sinon toute la grille repeint).
+    final progress = ref.watch(watchHistoryProvider.select((async) {
+      for (final e in async.value ?? const []) {
         if (e.key == '$sourceId::${movie.id}') return e.progress;
       }
       return 0.0;
-    }();
+    }));
     return PosterCard(
       title: movie.name,
       imageUrl: movie.logo,
@@ -518,7 +563,10 @@ class _ChannelPoster extends StatelessWidget {
               child: channel.logo == null
                   ? const Icon(Icons.live_tv)
                   : CachedNetworkImage(
-                      imageUrl: channel.logo!, fit: BoxFit.contain),
+                      imageUrl: channel.logo!,
+                      fit: BoxFit.contain,
+                      memCacheWidth: 200,
+                    ),
             ),
           ),
           const SizedBox(height: 6),

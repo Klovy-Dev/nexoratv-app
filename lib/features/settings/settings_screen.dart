@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../brand.dart';
+import '../../services/crash_log.dart';
 import '../../services/storage/settings_repository.dart';
 import '../../services/update_service.dart';
 import '../../state/account_provider.dart';
@@ -113,6 +115,13 @@ class SettingsScreen extends ConsumerWidget {
             title: const Text('Confidentialité'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => pushFade(context, const _PrivacyPage()),
+          ),
+          ListTile(
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('Diagnostic'),
+            subtitle: const Text('Dernier plantage enregistré'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => pushFade(context, const _DiagnosticPage()),
           ),
 
           const _SectionTitle('À propos'),
@@ -566,6 +575,87 @@ class _MultiScreenPage extends ConsumerWidget {
 }
 
 /// ─────────────────────────── Confidentialité ───────────────────────────
+
+class _DiagnosticPage extends StatefulWidget {
+  const _DiagnosticPage();
+
+  @override
+  State<_DiagnosticPage> createState() => _DiagnosticPageState();
+}
+
+class _DiagnosticPageState extends State<_DiagnosticPage> {
+  String? _report;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    CrashLog.lastReport().then((r) {
+      if (!mounted) return;
+      setState(() {
+        _report = r;
+        _loading = false;
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final report = _report;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Diagnostic'),
+        actions: [
+          if (report != null) ...[
+            IconButton(
+              tooltip: 'Copier',
+              icon: const Icon(Icons.copy_outlined),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: report));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Rapport copié.')),
+                );
+              },
+            ),
+            IconButton(
+              tooltip: 'Effacer',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () async {
+                await CrashLog.clear();
+                if (mounted) setState(() => _report = null);
+              },
+            ),
+          ],
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : report == null
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                      'Aucun plantage enregistré.\n\nSi l\'app se ferme sans '
+                      'rien laisser ici, c\'est un arrêt système (souvent un '
+                      'manque de mémoire sur Fire TV Stick) : il faut le '
+                      '« adb logcat » de l\'appareil.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
+              : ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    SelectableText(
+                      report,
+                      style: const TextStyle(
+                          fontFamily: 'monospace', fontSize: 11.5, height: 1.4),
+                    ),
+                  ],
+                ),
+    );
+  }
+}
 
 class _PrivacyPage extends StatelessWidget {
   const _PrivacyPage();

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -8,23 +9,30 @@ import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'features/home/home_screen.dart';
+import 'services/crash_log.dart';
 import 'services/data_migration.dart';
 import 'services/single_instance.dart';
 import 'state/settings_provider.dart';
 import 'theme.dart';
 import 'widgets/nav.dart';
 
-Future<void> main() async {
+void main() => runZonedGuarded(_main, CrashLog.onZoneError);
+
+Future<void> _main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: binding);
-
-  // Catalogues avec des milliers de jaquettes : on borne le cache image.
-  PaintingBinding.instance.imageCache
-    ..maximumSize = 600
-    ..maximumSizeBytes = 220 << 20; // ~220 Mo
+  await CrashLog.init();
 
   final isDesktop =
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+
+  // Catalogues avec des milliers de jaquettes : on borne le cache image.
+  // Les Fire TV Stick / box Android ont ~1 Go de RAM — un cache large (bon
+  // pour un PC) y déclenche un kill par le Low Memory Killer d'Android
+  // (l'app se ferme d'un coup, retour au menu du téléviseur).
+  PaintingBinding.instance.imageCache
+    ..maximumSize = isDesktop ? 600 : 120
+    ..maximumSizeBytes = (isDesktop ? 220 : 48) << 20;
 
   // Renommage iptv_player -> NexoraTV : recopie unique de l'ancien profil.
   await DataMigration.runIfNeeded();

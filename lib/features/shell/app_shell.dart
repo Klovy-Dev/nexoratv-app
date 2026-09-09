@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/playlist_source.dart';
@@ -15,8 +16,15 @@ import '../series/series_browser.dart';
 import '../settings/settings_screen.dart';
 import '../watchlist/watchlist_page.dart';
 
-/// Coquille de l'app : navigation latérale (desktop) / barre basse (mobile)
-/// avec Accueil · TV · Films · Séries · Ma liste, + barre du haut commune.
+/// Coquille de l'app : navigation latérale (desktop / TV) / barre basse
+/// (mobile) avec Accueil · TV · Films · Séries · Ma liste, + barre du haut.
+///
+/// Télécommande (Fire TV / Android TV / box) :
+/// - flèche **gauche** en bord de contenu → barre latérale ;
+/// - **Retour** depuis le contenu → barre latérale ;
+/// - **Retour** deux fois de suite → quitte l'app ;
+/// - flèche **droite** sur la barre latérale → revient dans le contenu ;
+/// - choisir un onglet à la télécommande ramène le focus dans le contenu.
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
@@ -26,6 +34,9 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell> {
   int _index = 0;
+  final _contentScope = FocusScopeNode(debugLabel: 'shell-content');
+  final _railScope = FocusScopeNode(debugLabel: 'shell-rail');
+  DateTime? _lastBackAt;
 
   static const _dests = [
     (icon: Icons.home_outlined, sel: Icons.home, label: 'Accueil'),
@@ -35,11 +46,69 @@ class _AppShellState extends ConsumerState<AppShell> {
     (icon: Icons.bookmark_border, sel: Icons.bookmark, label: 'Ma liste'),
   ];
 
+  @override
+  void dispose() {
+    _contentScope.dispose();
+    _railScope.dispose();
+    super.dispose();
+  }
+
+  void _select(int i) {
+    setState(() => _index = i);
+    // Après un choix à la télécommande, on ramène le focus dans le contenu.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _contentScope.requestFocus();
+    });
+  }
+
   void _openSearch() {
     final pl = ref.read(currentPlaylistProvider)?.value;
     final src = ref.read(selectedSourceProvider);
     if (pl == null || src == null) return;
     pushFade(context, GlobalSearchScreen(sourceId: src.id, playlist: pl));
+  }
+
+  void _handleBack({required bool railAvailable}) {
+    // 1er Retour depuis le contenu → barre latérale.
+    if (railAvailable && _contentScope.hasFocus) {
+      _railScope.requestFocus();
+      return;
+    }
+    // 2e Retour rapproché → quitter l'app.
+    final now = DateTime.now();
+    if (_lastBackAt != null &&
+        now.difference(_lastBackAt!) < const Duration(seconds: 2)) {
+      SystemNavigator.pop();
+      return;
+    }
+    _lastBackAt = now;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Appuyez encore sur Retour pour quitter'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  KeyEventResult _contentKeys(FocusNode node, KeyEvent event) {
+    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      // On bouge dans le contenu si possible, sinon on file à la barre latérale.
+      if (!_contentScope.focusInDirection(TraversalDirection.left)) {
+        _railScope.requestFocus();
+      }
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  KeyEventResult _railKeys(FocusNode node, KeyEvent event) {
+    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      _contentScope.requestFocus();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   @override
@@ -48,7 +117,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     final wide = MediaQuery.sizeOf(context).width >= 800;
 
     final pages = [
-      DashboardPage(onNavigate: (i) => setState(() => _index = i)),
+      DashboardPage(onNavigate: _select),
       _TvTab(sourceId: source?.id ?? ''),
       _MoviesTab(sourceId: source?.id ?? ''),
       SeriesBrowser(sourceId: source?.id ?? ''),
@@ -60,7 +129,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       children: [
         _TopBar(
           current: source,
-          // Sur desktop, Recherche/Paramètres restent dans la barre
+          // Sur desktop / TV, Recherche/Paramètres sont dans la barre
           // latérale ; sur mobile c'est le seul accès, on les garde ici.
           onSearch: wide ? null : _openSearch,
           onSettings:
@@ -71,11 +140,12 @@ class _AppShellState extends ConsumerState<AppShell> {
           child: loading ? const LinearProgressIndicator(minHeight: 2) : null,
         ),
         const Divider(height: 1),
-        // Amorce le focus au démarrage pour que la télécommande (D-pad) ait un
-        // point de départ, et empêche le focus d'atterrir sur un onglet masqué
-        // (IndexedStack garde tous les onglets montés et positionnés).
+        // Le contenu vit dans son propre FocusScope : le D-pad y navigue
+        // librement sans sauter par accident sur la barre latérale (on y va
+        // explicitement par flèche gauche au bord, ou par Retour).
         Expanded(
           child: FocusScope(
+            node: _contentScope,
             autofocus: true,
             child: IndexedStack(
               index: _index,
@@ -90,72 +160,99 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
 
     if (!wide) {
-      return Scaffold(
-        body: SafeArea(child: body),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: (i) => setState(() => _index = i),
-          destinations: [
-            for (final d in _dests)
-              NavigationDestination(
-                icon: Icon(d.icon),
-                selectedIcon: Icon(d.sel),
-                label: d.label,
-              ),
-          ],
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _handleBack(railAvailable: false);
+        },
+        child: Scaffold(
+          body: SafeArea(child: body),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: _index,
+            onDestinationSelected: (i) => setState(() => _index = i),
+            destinations: [
+              for (final d in _dests)
+                NavigationDestination(
+                  icon: Icon(d.icon),
+                  selectedIcon: Icon(d.sel),
+                  label: d.label,
+                ),
+            ],
+          ),
         ),
       );
     }
 
-    return Scaffold(
-      body: Row(
-        children: [
-          NavigationRail(
-            minWidth: 64,
-            labelType: NavigationRailLabelType.all,
-            selectedIndex: _index,
-            onDestinationSelected: (i) => setState(() => _index = i),
-            leading: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Image.asset('assets/icon/nexora_logo.png',
-                  width: 30, height: 30),
-            ),
-            trailing: Expanded(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'Rechercher',
-                        icon: const Icon(Icons.search),
-                        onPressed: _openSearch,
-                      ),
-                      IconButton(
-                        tooltip: 'Paramètres',
-                        icon: const Icon(Icons.settings_outlined),
-                        onPressed: () =>
-                            pushFade(context, const SettingsScreen()),
-                      ),
-                    ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack(railAvailable: true);
+      },
+      child: Scaffold(
+        body: Row(
+          children: [
+            FocusScope(
+              node: _railScope,
+              child: Focus(
+                onKeyEvent: _railKeys,
+                canRequestFocus: false,
+                skipTraversal: true,
+                child: NavigationRail(
+                  minWidth: 64,
+                  labelType: NavigationRailLabelType.all,
+                  selectedIndex: _index,
+                  onDestinationSelected: _select,
+                  leading: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Image.asset('assets/icon/nexora_logo.png',
+                        width: 30, height: 30, cacheWidth: 60),
                   ),
+                  trailing: Expanded(
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Rechercher',
+                              icon: const Icon(Icons.search),
+                              onPressed: _openSearch,
+                            ),
+                            IconButton(
+                              tooltip: 'Paramètres',
+                              icon: const Icon(Icons.settings_outlined),
+                              onPressed: () =>
+                                  pushFade(context, const SettingsScreen()),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  destinations: [
+                    for (final d in _dests)
+                      NavigationRailDestination(
+                        icon: Icon(d.icon),
+                        selectedIcon: Icon(d.sel),
+                        label: Text(d.label),
+                      ),
+                  ],
                 ),
               ),
             ),
-            destinations: [
-              for (final d in _dests)
-                NavigationRailDestination(
-                  icon: Icon(d.icon),
-                  selectedIcon: Icon(d.sel),
-                  label: Text(d.label),
-                ),
-            ],
-          ),
-          const VerticalDivider(width: 1),
-          Expanded(child: body),
-        ],
+            const VerticalDivider(width: 1),
+            Expanded(
+              child: Focus(
+                onKeyEvent: _contentKeys,
+                canRequestFocus: false,
+                skipTraversal: true,
+                child: body,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

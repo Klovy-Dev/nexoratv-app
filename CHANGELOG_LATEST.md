@@ -1,6 +1,7 @@
-Fire TV / Android TV — saisie et navigation
+Accueil, lecteur et navigation télécommande revus (Fire TV Stick)
 
-- Le clavier ne s'ouvre plus tout seul quand la télécommande arrive sur un champ : ça vaut pour l'ajout de source (Xtream / M3U) ET pour la recherche dans TV / Films / Séries et la recherche globale. On appuie sur OK (ou on touche) pour écrire, « Suivant » passe au champ suivant, OK rouvre le clavier — plus de blocage
-- Bouton Recherche ajouté dans la barre latérale : la recherche globale est enfin accessible à la télécommande
-- Bannière Android TV / Fire TV en vraie image (dégradé Nexora + logo) : l'app s'affiche correctement dans le menu du téléviseur
-- Saisie tactile inchangée : toucher un champ ouvre le clavier directement
+- Nouvel accueil : le bandeau violet (site / WhatsApp / avis) est remplacé par un bandeau de films ET séries mis en avant qui défile toutes les 20 s (affiche, note, « Lecture » / « Voir »)
+- Stabilité Fire TV Stick : mémoire mieux maîtrisée (cache image plafonné, affiches à la bonne taille) — vise les fermetures brutales « retour au menu du téléviseur »
+- Retour depuis le contenu → barre latérale ; Retour deux fois → quitte l'app ; flèche gauche au bord → barre latérale ; flèche droite sur la barre → revient au contenu
+- Lecteur : quand les commandes sont affichées, le D-pad navigue entre les boutons (Pistes, Retour, précédent/suivant) ; masquées, les flèches zappent / avancent comme avant
+- Nouveau Paramètres → Diagnostic : dernier plantage enregistré (à copier)
