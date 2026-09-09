@@ -64,7 +64,9 @@ class PosterCard extends StatelessWidget {
         : CachedNetworkImage(
             imageUrl: imageUrl!,
             fit: BoxFit.cover,
-            memCacheWidth: 320, // décode à la taille d'affichage
+            filterQuality: FilterQuality.low,
+            memCacheWidth: 200, // décode à la taille d'affichage (léger sur TV)
+            maxWidthDiskCache: 360,
             fadeInDuration: const Duration(milliseconds: 200),
             placeholder: (_, _) =>
                 Container(color: scheme.surfaceContainerHighest),
@@ -93,6 +95,7 @@ class PosterCard extends StatelessWidget {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
+                    clipBehavior: Clip.hardEdge, // pas de saveLayer (GPU TV)
                     child: Stack(
                       fit: StackFit.expand,
                       children: [

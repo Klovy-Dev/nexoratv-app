@@ -70,8 +70,8 @@ class _Dashboard extends ConsumerWidget {
         .take(18)
         .toList();
 
-    final recentMovies = playlist.recentMovies(20);
-    final recentSeries = playlist.recentSeries(12);
+    final recentMovies = playlist.recentMovies(14);
+    final recentSeries = playlist.recentSeries(10);
     final featured = _featuredItems(
       recentMovies,
       playlist.movies,
@@ -159,9 +159,9 @@ class _Dashboard extends ConsumerWidget {
                 ),
             ],
           ),
-        for (final g in playlist.topMovieGroups(6))
+        for (final g in playlist.topMovieGroups(4))
           Builder(builder: (context) {
-            final items = playlist.moviesInGroup(g).take(20).toList();
+            final items = playlist.moviesInGroup(g).take(14).toList();
             if (items.isEmpty) return const SizedBox.shrink();
             return _Rail(
               title: prettyCategory(g),
@@ -298,18 +298,17 @@ class _FeaturedHeroState extends State<_FeaturedHero> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 400),
-            child: CachedNetworkImage(
-              key: ValueKey(item.id),
-              imageUrl: item.image ?? '',
-              fit: BoxFit.cover,
-              memCacheWidth: 720,
-              placeholder: (_, _) =>
-                  Container(color: scheme.surfaceContainerHighest),
-              errorWidget: (_, _, _) =>
-                  Container(color: scheme.surfaceContainerHighest),
-            ),
+          CachedNetworkImage(
+            key: ValueKey(item.id),
+            imageUrl: item.image ?? '',
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.low,
+            memCacheWidth: 480,
+            fadeInDuration: const Duration(milliseconds: 250),
+            placeholder: (_, _) =>
+                Container(color: scheme.surfaceContainerHighest),
+            errorWidget: (_, _, _) =>
+                Container(color: scheme.surfaceContainerHighest),
           ),
           // Voiles pour la lisibilité du texte.
           const DecoratedBox(

@@ -32,6 +32,12 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- Fire TV Stick / vieux boîtiers Android : leur GPU fait planter
+                 Impeller (écran blanc puis fermeture sur les écrans chargés).
+                 On force le moteur Skia, stable sur ce matériel. -->
+            <meta-data
+              android:name="io.flutter.embedding.android.EnableImpeller"
+              android:value="false" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
