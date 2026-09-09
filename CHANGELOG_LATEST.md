@@ -1,6 +1,6 @@
-Navigation télécommande revue
+Saisie au clavier revue (Android TV / Fire TV / box)
 
-- Formulaires (ajout d'une source Xtream / M3U) : plus de clavier qui s'ouvre tout seul, les champs s'enchaînent de haut en bas sans repartir en haut, le bouton reste toujours atteignable à la télécommande
-- On voit beaucoup mieux où on est : anneau blanc net sur les boutons, rangée mise en évidence dans les listes de chaînes et de catégories
-- Lecteur : touches OK / Retour / Lecture-Pause / chaîne +/- / avance rapide prises en charge sur davantage de télécommandes ; après l'écran « Pistes » les touches répondent encore
-- L'app est reconnue comme application Android TV / Fire TV (visible sur l'écran d'accueil, bannière dédiée)
+- Ajout d'une source (Xtream / M3U) : le clavier ne s'ouvre plus tout seul quand on arrive sur un champ à la télécommande — on appuie sur OK (ou on touche le champ) pour écrire
+- « Suivant » descend au champ suivant sans ouvrir le clavier ; OK le rouvre à chaque champ — fini le blocage après le premier champ
+- Quelle que soit la façon de sortir d'un champ, la navigation à la télécommande reprend la main normalement
+- Saisie tactile inchangée : toucher un champ ouvre le clavier directement

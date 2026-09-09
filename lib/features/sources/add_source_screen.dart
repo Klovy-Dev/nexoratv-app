@@ -38,16 +38,6 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
   final _username = TextEditingController();
   final _password = TextEditingController();
 
-  // Nœuds de focus explicites : la télécommande (Android TV / Fire TV / box)
-  // enchaîne les champs via ces nœuds. On évite ainsi `nextFocus()` de l'IME,
-  // qui rebouclait vers le premier champ (« Suivant » renvoyait tout en haut).
-  final _nameNode = FocusNode();
-  final _m3uUrlNode = FocusNode();
-  final _epgUrlNode = FocusNode();
-  final _hostNode = FocusNode();
-  final _usernameNode = FocusNode();
-  final _passwordNode = FocusNode();
-
   bool _busy = false;
   String? _error;
   String? _deviceMac;
@@ -88,16 +78,6 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
   void dispose() {
     for (final c in [_name, _m3uUrl, _epgUrl, _host, _username, _password]) {
       c.dispose();
-    }
-    for (final n in [
-      _nameNode,
-      _m3uUrlNode,
-      _epgUrlNode,
-      _hostNode,
-      _usernameNode,
-      _passwordNode,
-    ]) {
-      n.dispose();
     }
     super.dispose();
   }
@@ -290,15 +270,41 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextFormField(
+            _TvTextField(
               controller: _name,
-              focusNode: _nameNode,
-              textInputAction: TextInputAction.next,
-              onEditingComplete: () => _hostNode.requestFocus(),
-              decoration: const InputDecoration(labelText: 'Nom (facultatif)'),
+              label: 'Nom (facultatif)',
+              autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            _TvTextField(
+              controller: _host,
+              label: 'Adresse du serveur',
+              hint: 'http://exemple.com:8080',
+              keyboardType: TextInputType.url,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Champ requis' : null,
+            ),
+            const SizedBox(height: 12),
+            _TvTextField(
+              controller: _username,
+              label: 'Identifiant',
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Champ requis' : null,
+            ),
+            const SizedBox(height: 12),
+            _TvTextField(
+              controller: _password,
+              label: 'Mot de passe',
+              obscureText: true,
+              isLast: true,
+              onSubmitted: () {
+                if (!_busy) _submitXtream();
+              },
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Champ requis' : null,
             ),
             const SizedBox(height: 16),
-            ..._xtreamFields(),
+            _outputSelector(),
             ..._errorBanner(),
             const SizedBox(height: 24),
             FilledButton.icon(
@@ -323,42 +329,30 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextFormField(
+            _TvTextField(
               controller: _name,
-              focusNode: _nameNode,
-              textInputAction: TextInputAction.next,
-              onEditingComplete: () => _m3uUrlNode.requestFocus(),
-              decoration: const InputDecoration(labelText: 'Nom (facultatif)'),
+              label: 'Nom (facultatif)',
+              autofocus: true,
             ),
-            const SizedBox(height: 16),
-            TextFormField(
+            const SizedBox(height: 12),
+            _TvTextField(
               controller: _m3uUrl,
-              focusNode: _m3uUrlNode,
+              label: 'URL de la playlist M3U',
+              hint: 'https://exemple.com/playlist.m3u',
               keyboardType: TextInputType.url,
-              autocorrect: false,
-              textInputAction: TextInputAction.next,
-              onEditingComplete: () => _epgUrlNode.requestFocus(),
-              decoration: const InputDecoration(
-                labelText: 'URL de la playlist M3U',
-                hintText: 'https://exemple.com/playlist.m3u',
-              ),
               validator: (v) => (v == null || !v.trim().startsWith('http'))
                   ? 'URL invalide'
                   : null,
             ),
-            const SizedBox(height: 16),
-            TextFormField(
+            const SizedBox(height: 12),
+            _TvTextField(
               controller: _epgUrl,
-              focusNode: _epgUrlNode,
+              label: 'URL EPG XMLTV (facultatif)',
               keyboardType: TextInputType.url,
-              autocorrect: false,
-              textInputAction: TextInputAction.done,
-              onEditingComplete: () {
-                _epgUrlNode.unfocus();
+              isLast: true,
+              onSubmitted: () {
                 if (!_busy) _submitM3u();
               },
-              decoration:
-                  const InputDecoration(labelText: 'URL EPG XMLTV (facultatif)'),
             ),
             ..._errorBanner(),
             const SizedBox(height: 24),
@@ -384,11 +378,10 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
         if (!_isMacEdit)
-          TextFormField(
+          _TvTextField(
             controller: _name,
-            focusNode: _nameNode,
-            textInputAction: TextInputAction.done,
-            decoration: const InputDecoration(labelText: 'Nom (facultatif)'),
+            label: 'Nom (facultatif)',
+            isLast: true,
           ),
         if (!_isMacEdit) const SizedBox(height: 16),
         Card(
@@ -476,67 +469,180 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
         child: CircularProgressIndicator(strokeWidth: 2),
       );
 
-  List<Widget> _xtreamFields() => [
-        TextFormField(
-          controller: _host,
-          focusNode: _hostNode,
-          keyboardType: TextInputType.url,
-          autocorrect: false,
-          textInputAction: TextInputAction.next,
-          onEditingComplete: () => _usernameNode.requestFocus(),
-          decoration: const InputDecoration(
-            labelText: 'Adresse du serveur',
-            hintText: 'http://exemple.com:8080',
+  Widget _outputSelector() => InputDecorator(
+        decoration:
+            const InputDecoration(labelText: 'Format des flux en direct'),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<XtreamOutput>(
+            value: _output,
+            isDense: true,
+            onChanged: (v) => setState(() => _output = v ?? XtreamOutput.ts),
+            items: const [
+              DropdownMenuItem(
+                value: XtreamOutput.ts,
+                child: Text('MPEG-TS (.ts) — compatible'),
+              ),
+              DropdownMenuItem(
+                value: XtreamOutput.m3u8,
+                child: Text('HLS (.m3u8) — meilleur buffering'),
+              ),
+            ],
           ),
-          validator: (v) =>
-              (v == null || v.trim().isEmpty) ? 'Champ requis' : null,
         ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _username,
-          focusNode: _usernameNode,
-          autocorrect: false,
-          textInputAction: TextInputAction.next,
-          onEditingComplete: () => _passwordNode.requestFocus(),
-          decoration: const InputDecoration(labelText: 'Identifiant'),
-          validator: (v) =>
-              (v == null || v.trim().isEmpty) ? 'Champ requis' : null,
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _password,
-          focusNode: _passwordNode,
-          obscureText: true,
-          textInputAction: TextInputAction.done,
-          onEditingComplete: () {
-            _passwordNode.unfocus();
-            if (!_busy) _submitXtream();
+      );
+}
+
+/// Champ texte pensé pour la navigation télécommande (Android TV / Fire TV /
+/// box) **et** l'usage tactile.
+///
+/// Problème résolu : un `TextField` classique ouvre l'IME dès qu'il **reçoit**
+/// le focus (le D-pad qui passe dessus suffit), et une fois le clavier fermé
+/// la touche OK ne le rouvre pas — l'utilisateur se retrouve bloqué.
+///
+/// Ici, seul un conteneur est atteint par le D-pad. Il faut appuyer sur OK
+/// (ou toucher le champ) pour entrer en édition : `readOnly` passe alors à
+/// `false` et une demande de focus à la frame suivante ouvre l'IME de façon
+/// fiable. « Suivant » sur le clavier redescend simplement au champ suivant
+/// (sans ouvrir l'IME) ; OK le rouvre. Toute sortie du champ (clavier fermé,
+/// D-pad, focus déplacé) repasse en mode navigation.
+class _TvTextField extends StatefulWidget {
+  const _TvTextField({
+    required this.controller,
+    required this.label,
+    this.hint,
+    this.obscureText = false,
+    this.keyboardType,
+    this.isLast = false,
+    this.autofocus = false,
+    this.validator,
+    this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String? hint;
+  final bool obscureText;
+  final TextInputType? keyboardType;
+
+  /// Dernier champ du formulaire : action « OK » du clavier au lieu de
+  /// « Suivant », et [onSubmitted] est appelé à la validation.
+  final bool isLast;
+  final bool autofocus;
+  final String? Function(String?)? validator;
+  final VoidCallback? onSubmitted;
+
+  @override
+  State<_TvTextField> createState() => _TvTextFieldState();
+}
+
+class _TvTextFieldState extends State<_TvTextField> {
+  // Cible du D-pad. Le champ éditable, lui, est `skipTraversal` : joignable
+  // uniquement par une demande de focus explicite (OK / toucher).
+  final _wrapperNode = FocusNode(debugLabel: 'tvtf-wrapper');
+  final _fieldNode =
+      FocusNode(debugLabel: 'tvtf-field', skipTraversal: true);
+
+  bool _wrapperFocused = false;
+  bool _editing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fieldNode.addListener(_onFieldFocusChanged);
+  }
+
+  @override
+  void dispose() {
+    _fieldNode.removeListener(_onFieldFocusChanged);
+    _fieldNode.dispose();
+    _wrapperNode.dispose();
+    super.dispose();
+  }
+
+  void _onFieldFocusChanged() {
+    // Filet de sécurité : quelle que soit la façon de quitter le champ, on
+    // ne reste jamais coincé en mode édition.
+    if (!_fieldNode.hasFocus && _editing) {
+      setState(() => _editing = false);
+    }
+  }
+
+  void _startEditing() {
+    if (_editing) return;
+    setState(() => _editing = true);
+    // `readOnly` vient de passer à false : demander le focus à la frame
+    // suivante ouvre l'IME de façon fiable, box Android comprises.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fieldNode.requestFocus();
+    });
+  }
+
+  void _handleSubmitted(String _) {
+    setState(() => _editing = false);
+    _wrapperNode.requestFocus();
+    if (widget.isLast) {
+      widget.onSubmitted?.call();
+    } else {
+      // Redescend au champ suivant sans ouvrir le clavier : OK le rouvrira.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _wrapperNode.nextFocus();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return FocusableActionDetector(
+      focusNode: _wrapperNode,
+      autofocus: widget.autofocus,
+      onShowFocusHighlight: (v) => setState(() => _wrapperFocused = v),
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            _startEditing();
+            return null;
           },
-          decoration: const InputDecoration(labelText: 'Mot de passe'),
-          validator: (v) =>
-              (v == null || v.trim().isEmpty) ? 'Champ requis' : null,
         ),
-        const SizedBox(height: 16),
-        InputDecorator(
-          decoration:
-              const InputDecoration(labelText: 'Format des flux en direct'),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<XtreamOutput>(
-              value: _output,
-              isDense: true,
-              onChanged: (v) => setState(() => _output = v ?? XtreamOutput.ts),
-              items: const [
-                DropdownMenuItem(
-                  value: XtreamOutput.ts,
-                  child: Text('MPEG-TS (.ts) — compatible'),
-                ),
-                DropdownMenuItem(
-                  value: XtreamOutput.m3u8,
-                  child: Text('HLS (.m3u8) — meilleur buffering'),
-                ),
-              ],
+      },
+      child: GestureDetector(
+        onTap: _startEditing,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _wrapperFocused && !_editing
+                  ? scheme.primary
+                  : Colors.transparent,
+              width: 2,
+            ),
+          ),
+          child: TextFormField(
+            controller: widget.controller,
+            focusNode: _fieldNode,
+            readOnly: !_editing,
+            obscureText: widget.obscureText,
+            keyboardType: widget.keyboardType,
+            autocorrect: false,
+            enableSuggestions: false,
+            enableInteractiveSelection: _editing,
+            textInputAction:
+                widget.isLast ? TextInputAction.done : TextInputAction.next,
+            onTap: _startEditing,
+            onTapOutside: (_) {
+              if (_editing) _fieldNode.unfocus();
+            },
+            onFieldSubmitted: _handleSubmitted,
+            validator: widget.validator,
+            decoration: InputDecoration(
+              labelText: widget.label,
+              hintText: widget.hint,
             ),
           ),
         ),
-      ];
+      ),
+    );
+  }
 }
