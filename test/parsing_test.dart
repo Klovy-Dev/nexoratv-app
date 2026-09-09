@@ -3,6 +3,7 @@ import 'package:nexoratv/models/channel.dart';
 import 'package:nexoratv/models/playlist_source.dart';
 import 'package:nexoratv/services/m3u_parser.dart';
 import 'package:nexoratv/services/playlist_service.dart';
+import 'package:nexoratv/services/update_service.dart';
 
 void main() {
   group('M3uParser', () {
@@ -125,6 +126,53 @@ http://host/stream/1
       final r = mostRecent<Channel>(
           list, (x) => x.addedAt, (x) => int.tryParse(x.streamId ?? ''), 10);
       expect(r.map((e) => e.id).toList(), ['b', 'c', 'a']);
+    });
+  });
+
+  group('UpdateService.parseManifest', () {
+    const nested = '''
+{
+  "windows": {"version": "2.1.0", "url": "http://x/win.exe", "notes": "W", "mandatory": true},
+  "android": {"version": "1.5.0", "url": "http://x/app.apk", "notes": "A", "mandatory": false}
+}''';
+
+    test('format par plateforme — versions indépendantes', () {
+      final win = UpdateService.parseManifest(nested,
+          currentVersion: '1.3.4', isAndroid: false);
+      expect(win!.version, '2.1.0');
+      expect(win.downloadUrl, 'http://x/win.exe');
+      expect(win.mandatory, true);
+
+      final and = UpdateService.parseManifest(nested,
+          currentVersion: '1.3.4', isAndroid: true);
+      expect(and!.version, '1.5.0');
+      expect(and.downloadUrl, 'http://x/app.apk');
+      expect(and.mandatory, false);
+    });
+
+    test('rien si la plateforme est déjà à jour', () {
+      expect(
+        UpdateService.parseManifest(nested,
+            currentVersion: '1.5.0', isAndroid: true),
+        isNull,
+      );
+    });
+
+    test('repli sur l\'ancien format à plat', () {
+      const flat = '{"version":"1.4.0","windows_url":"http://x/w",'
+          '"android_url":"http://x/a","notes":"N"}';
+      final r = UpdateService.parseManifest(flat,
+          currentVersion: '1.3.4', isAndroid: true);
+      expect(r!.version, '1.4.0');
+      expect(r.downloadUrl, 'http://x/a');
+    });
+
+    test('JSON illisible -> null', () {
+      expect(
+        UpdateService.parseManifest('pas du json',
+            currentVersion: '1.0.0', isAndroid: true),
+        isNull,
+      );
     });
   });
 }

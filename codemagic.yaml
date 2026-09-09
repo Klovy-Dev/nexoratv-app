@@ -23,6 +23,15 @@ workflows:
     name: iOS · TestFlight
     max_build_duration: 60
     instance_type: mac_mini_m2
+    # Version iOS indépendante de Windows/Android : on pousse un tag `ios-v1.0.5`.
+    # (Le déclenchement manuel depuis l'interface Codemagic reste possible : sans
+    #  tag, le build retombe sur la version de pubspec.yaml.)
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "ios-v*"
+          include: true
     integrations:
       app_store_connect: AppStoreConnect
     environment:
@@ -55,7 +64,11 @@ workflows:
         script: find . -name "Podfile" -execdir pod install \;
       - name: Build IPA
         script: |
-          BUILD_NAME=$(grep '^version:' pubspec.yaml | sed 's/version: //; s/+.*//')
+          # Version : tag `ios-vX.Y.Z` s'il a déclenché le build, sinon pubspec.
+          case "${CM_TAG:-}" in
+            ios-v*) BUILD_NAME="${CM_TAG#ios-v}" ;;
+            *)      BUILD_NAME=$(grep '^version:' pubspec.yaml | sed 's/version: //; s/+.*//') ;;
+          esac
           flutter build ipa --release \
             --build-name="$BUILD_NAME" \
             --build-number=$PROJECT_BUILD_NUMBER \

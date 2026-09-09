@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -25,16 +26,26 @@ class UpdateInfo {
 
 /// Vérifie et applique les mises à jour à partir d'un manifeste JSON distant.
 ///
-/// Format attendu du manifeste :
+/// Format courant — un bloc par plateforme, versions indépendantes :
 /// ```json
 /// {
-///   "version": "1.1.0",
-///   "notes": "…",
-///   "windows_url": "https://…/NexoraTV-1.1.0-windows-x64.zip",
-///   "android_url":  "https://…/nexoratv-1.1.0.apk",
-///   "mandatory": false
+///   "windows": {
+///     "version": "2.1.0",
+///     "url": "https://…/NexoraTV-Setup-2.1.0.exe",
+///     "notes": "…",
+///     "mandatory": false
+///   },
+///   "android": {
+///     "version": "1.5.0",
+///     "url": "https://…/NexoraTV-1.5.0.apk",
+///     "notes": "…",
+///     "mandatory": false
+///   }
 /// }
 /// ```
+///
+/// Ancien format (toujours accepté en repli) : champs `version`, `windows_url`,
+/// `android_url`, `notes`, `mandatory` à plat.
 class UpdateService {
   UpdateService({Dio? dio})
       : _dio = dio ??
@@ -67,22 +78,59 @@ class UpdateService {
         manifestUrl,
         options: Options(responseType: ResponseType.plain),
       );
-      final map = jsonDecode('${res.data}') as Map<String, dynamic>;
-      final latest = '${map['version'] ?? ''}'.trim();
-      if (latest.isEmpty || !_isNewer(latest, current)) return null;
-      final url = Platform.isAndroid
-          ? map['android_url'] as String?
-          : map['windows_url'] as String?;
-      return UpdateInfo(
-        version: latest,
+      return parseManifest(
+        '${res.data}',
         currentVersion: current,
-        notes: (map['notes'] as String?)?.trim(),
-        downloadUrl: url,
-        mandatory: map['mandatory'] == true,
+        isAndroid: Platform.isAndroid,
       );
     } catch (_) {
       return null;
     }
+  }
+
+  /// Extrait l'entrée de mise à jour applicable pour la plateforme courante,
+  /// ou `null` si le manifeste est illisible / pas plus récent. Séparé de
+  /// [check] pour être testable sans réseau.
+  @visibleForTesting
+  static UpdateInfo? parseManifest(
+    String json, {
+    required String currentVersion,
+    required bool isAndroid,
+  }) {
+    final Map<String, dynamic> map;
+    try {
+      map = jsonDecode(json) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+
+    final block = map[isAndroid ? 'android' : 'windows'];
+    final String latest;
+    final String? url;
+    final String? notes;
+    final bool mandatory;
+    if (block is Map<String, dynamic>) {
+      // Format par plateforme.
+      latest = '${block['version'] ?? ''}'.trim();
+      url = block['url'] as String?;
+      notes = (block['notes'] as String?)?.trim();
+      mandatory = block['mandatory'] == true;
+    } else {
+      // Ancien format à plat.
+      latest = '${map['version'] ?? ''}'.trim();
+      url = (isAndroid ? map['android_url'] : map['windows_url']) as String?;
+      notes = (map['notes'] as String?)?.trim();
+      mandatory = map['mandatory'] == true;
+    }
+
+    if (latest.isEmpty || !_isNewer(latest, currentVersion)) return null;
+    return UpdateInfo(
+      version: latest,
+      currentVersion: currentVersion,
+      notes: notes,
+      downloadUrl: url,
+      mandatory: mandatory,
+    );
   }
 
   /// Télécharge le paquet et lance l'installeur / l'APK.

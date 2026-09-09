@@ -45,28 +45,50 @@ Prérequis pour l'installeur : **Inno Setup 6**
 
 ## Système de mise à jour
 
-1. Héberger un fichier **`update.json`** (voir modèle à la racine) — par ex.
-   `raw.githubusercontent.com/<user>/<repo>/main/update.json`.
-2. Renseigner cette URL dans **Paramètres → Mises à jour → URL du manifeste**
-   (valeur par défaut : `kDefaultUpdateManifestUrl` dans
-   `lib/services/storage/settings_repository.dart`).
-3. À chaque version : pousser un tag `vX.Y.Z`. Le workflow
-   `.github/workflows/release.yml` build le zip Windows + l'APK, crée la
-   *GitHub Release*, et met à jour `update.json` sur `main`.
-4. L'app compare `pubspec.yaml > version` au manifeste, propose le
-   téléchargement, puis lance l'installeur (Windows) ou l'APK (Android,
-   permission `REQUEST_INSTALL_PACKAGES`).
+Chaque plateforme a **sa propre version** et se release indépendamment via un
+tag préfixé :
 
-Format `update.json` :
+| Tag poussé        | Ce qui est buildé                     | Par            |
+|-------------------|---------------------------------------|----------------|
+| `win-v2.1.0`      | Installeur Windows + zip portable     | GitHub Actions |
+| `android-v1.5.0`  | APK release                           | GitHub Actions |
+| `ios-v1.0.5`      | IPA → TestFlight                      | Codemagic      |
+| `v1.4.0` *(ancien schéma)* | Windows **+** Android d'un coup | GitHub Actions |
+
+1. Le workflow `.github/workflows/release.yml` build la (les) plateforme(s)
+   concernée(s), crée la *GitHub Release* du tag, et met à jour le **bloc
+   correspondant** de `update.json` sur `main` — l'autre plateforme n'est pas
+   touchée.
+2. L'app lit **un seul** manifeste (`kDefaultUpdateManifestUrl` dans
+   `lib/services/storage/settings_repository.dart`, modifiable dans
+   **Paramètres → Mises à jour**), y prend le bloc de sa plateforme, compare à
+   sa version courante et propose le téléchargement : installeur (Windows) ou
+   APK (Android, permission `REQUEST_INSTALL_PACKAGES`).
+3. iOS ne consulte pas le manifeste : les MAJ passent par TestFlight /
+   l'App Store.
+
+Format `update.json` (bloc par plateforme) :
 ```json
 {
-  "version": "1.1.0",
-  "notes": "…",
-  "windows_url": "https://…/NexoraTV-1.1.0-windows-x64.zip",
-  "android_url":  "https://…/nexoratv-1.1.0.apk",
-  "mandatory": false
+  "windows": {
+    "version": "2.1.0",
+    "url": "https://…/NexoraTV-Setup-2.1.0.exe",
+    "notes": "…",
+    "mandatory": false
+  },
+  "android": {
+    "version": "1.5.0",
+    "url": "https://…/NexoraTV-1.5.0.apk",
+    "notes": "…",
+    "mandatory": false
+  }
 }
 ```
+
+Les champs à plat (`version`, `windows_url`, `android_url`) restent écrits pour
+les clients d'avant la migration — `version` à plat vaut la plus **basse** des
+deux plateformes, pour ne jamais proposer un téléchargement inadapté.
+`UpdateService.parseManifest` lit les deux formats.
 
 ## Prérequis dev
 
