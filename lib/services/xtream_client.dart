@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:dio/dio.dart';
 
@@ -97,7 +98,11 @@ class XtreamClient {
   Future<dynamic> _get(Map<String, String> params) async {
     final body = await _getRaw(params);
     try {
-      final decoded = jsonDecode(body);
+      // Gros catalogues : le jsonDecode (plusieurs Mo) gèle le thread UI
+      // pendant le rafraîchissement de fond — on le passe en isolate.
+      final decoded = body.length > 400000
+          ? await Isolate.run(() => jsonDecode(body))
+          : jsonDecode(body);
       if (decoded is! List) {
         _log('${params['action'] ?? 'auth'} : type=${decoded.runtimeType}, '
             'début=${body.substring(0, body.length.clamp(0, 400))}');
@@ -178,7 +183,9 @@ class XtreamClient {
     final streams = _asList(await _get({'action': streamsAction}));
 
     final result = <Channel>[];
+    var seen = 0;
     for (final s in streams) {
+      if (++seen % 3000 == 0) await Future<void>.delayed(Duration.zero);
       if (s is! Map) continue;
       final id = '${s['stream_id']}';
       if (id.isEmpty || id == 'null') continue;
@@ -263,7 +270,9 @@ class XtreamClient {
     final list = _asList(await _get({'action': 'get_series'}));
 
     final result = <Series>[];
+    var seen = 0;
     for (final s in list) {
+      if (++seen % 3000 == 0) await Future<void>.delayed(Duration.zero);
       if (s is! Map) continue;
       final id = '${s['series_id']}';
       if (id.isEmpty || id == 'null') continue;
