@@ -65,6 +65,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
   Timer? _progressTimer;
   Timer? _numberTimer;
   Timer? _retryTimer;
+  Timer? _stallTimer;
+  bool _reopening = false;
 
   int? _resumeMs;
   String _numberInput = '';
@@ -114,11 +116,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
       if (mounted) setState(() => _tracks = t);
     }));
     _subs.add(_player.stream.completed.listen((done) {
+      if (!done || !mounted) return;
       // Fin d'un épisode de série -> enchaîne automatiquement.
-      if (done &&
-          _current.kind == MediaKind.series &&
+      if (_current.kind == MediaKind.series &&
           _index < widget.playlist.length - 1) {
         _zap(1);
+      } else if (!_isVod && _error == null) {
+        // Un flux LIVE ne "se termine" jamais normalement : le serveur a
+        // coupé. On relance sans rien afficher à l'utilisateur.
+        _openCurrent();
       }
     }));
     _subs.add(_player.stream.duration.listen((d) {
@@ -132,8 +138,36 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
     _progressTimer = Timer.periodic(
         const Duration(seconds: 10), (_) => _saveProgress());
 
+    // Chien de garde : un flux live qui gèle (position figée alors qu'on est
+    // censé lire) n'émet souvent NI erreur NI "completed" — on le détecte et
+    // on relance, sans que l'utilisateur ait à zapper aller-retour.
+    _stallTimer = Timer.periodic(const Duration(seconds: 4), _checkLiveStall);
+
     _openCurrent();
     _scheduleHide();
+  }
+
+  Duration _lastCheckedPos = Duration.zero;
+  int _stalledChecks = 0;
+
+  void _checkLiveStall(Timer _) {
+    if (!mounted || _isVod || _error != null || !_playing || _reopening) {
+      _stalledChecks = 0;
+      return;
+    }
+    final pos = _player.state.position;
+    if (pos > _lastCheckedPos) {
+      _stalledChecks = 0; // la lecture avance, tout va bien
+    } else {
+      _stalledChecks++;
+      // ~12 s (3 tics de 4 s) sans que la position bouge alors qu'on est
+      // censé lire un live : le flux a décroché, on relance.
+      if (_stalledChecks >= 3) {
+        _stalledChecks = 0;
+        _openCurrent();
+      }
+    }
+    _lastCheckedPos = pos;
   }
 
   /// Réglages bas niveau de libmpv (Android surtout) : media_kit ne les met
@@ -153,6 +187,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
       'framedrop': 'vo',
       'vd-lavc-fast': 'yes',
       'vd-lavc-skiploopfilter': 'nonkey',
+      // FFmpeg se reconnecte tout seul si le flux HTTP décroche (coupure
+      // réseau, serveur qui lâche la connexion) au lieu de rester bloqué.
+      'stream-lavf-o':
+          'reconnect=1,reconnect_at_eof=1,reconnect_streamed=1,'
+              'reconnect_on_network_error=1,reconnect_delay_max=5',
     }.entries) {
       native.setProperty(e.key, e.value);
     }
@@ -169,8 +208,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
   }
 
   Future<void> _openCurrent() async {
+    if (_reopening) return;
+    _reopening = true;
     _retries = 0;
     _retryTimer?.cancel();
+    _stalledChecks = 0;
+    _lastCheckedPos = Duration.zero;
     setState(() {
       _error = null;
       _buffering = true;
@@ -184,11 +227,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
             .read(watchHistoryProvider.notifier)
             .resumePositionMs(widget.sourceId, _current.id)
         : null;
-    // Coupe complètement le flux précédent avant d'ouvrir le nouveau : sinon
-    // sur Android l'audio de l'ancienne chaîne/film continue par-dessus.
-    await _player.stop();
-    if (!mounted) return;
-    await _player.open(Media(_current.url));
+    try {
+      // Coupe complètement le flux précédent avant d'ouvrir le nouveau : sinon
+      // sur Android l'audio de l'ancienne chaîne/film continue par-dessus.
+      await _player.stop();
+      if (!mounted) return;
+      await _player.open(Media(_current.url));
+    } finally {
+      _reopening = false;
+    }
   }
 
   void _saveProgress() {
@@ -500,6 +547,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
     _progressTimer?.cancel();
     _numberTimer?.cancel();
     _retryTimer?.cancel();
+    _stallTimer?.cancel();
     for (final s in _subs) {
       s.cancel();
     }
