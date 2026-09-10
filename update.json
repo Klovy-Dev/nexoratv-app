@@ -6,13 +6,13 @@
     "mandatory": false
   },
   "android": {
-    "version": "1.4.2",
-    "url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/android-v1.4.2/NexoraTV-1.4.2.apk",
-    "notes": "Chaîne live qui décroche : se relance toute seule\n\n- Quand un flux TV en direct se coupe (coupure réseau, serveur qui lâche), le lecteur se reconnecte automatiquement au lieu de rester figé — plus besoin de zapper aller-retour\n- FFmpeg reconnecte de lui-même en cas de coupure ; en plus, un « chien de garde » détecte une image figée depuis plus de 12 s et relance le flux\n- Inclut 1.4.1 : décodage vidéo matériel (fin des saccades sur Fire TV Stick), accueil bleu nuit, navigation revue",
+    "version": "1.4.3",
+    "url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/android-v1.4.3/NexoraTV-1.4.3.apk",
+    "notes": "Lecteur : gros buffer + plus de mémoire (approche IBOGOLD)\n\n- Mise en cache large et lecture ~30 s d'avance : encaisse les à-coups réseau et les serveurs qui limitent le débit\n- En sous-alimentation : courte pause nette le temps de refaire une réserve, puis lecture fluide — au lieu d'un hoquet permanent\n- Tampon par défaut passé de 32 à 64 Mo\n- Plus de mémoire allouée à l'app (largeHeap), comme les apps TV natives\n- Inclut 1.4.2 (reconnexion auto des lives) et 1.4.1 (décodage matériel, bleu nuit)",
     "mandatory": false
   },
   "version": "1.3.3",
   "windows_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/v1.3.3/NexoraTV-Setup-1.3.3.exe",
-  "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/android-v1.4.2/NexoraTV-1.4.2.apk",
+  "android_url": "https://github.com/Klovy-Dev/nexoratv-app/releases/download/android-v1.4.3/NexoraTV-1.4.3.apk",
   "mandatory": false
 }
