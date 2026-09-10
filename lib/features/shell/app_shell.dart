@@ -117,7 +117,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     final wide = MediaQuery.sizeOf(context).width >= 800;
 
     final pages = [
-      DashboardPage(onNavigate: _select),
+      DashboardPage(onNavigate: _select, active: _index == 0),
       _TvTab(sourceId: source?.id ?? ''),
       _MoviesTab(sourceId: source?.id ?? ''),
       SeriesBrowser(sourceId: source?.id ?? ''),

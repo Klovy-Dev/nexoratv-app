@@ -20,8 +20,16 @@ import '../detail/media_detail_screen.dart';
 import '../player/player_screen.dart';
 
 class DashboardPage extends ConsumerWidget {
-  const DashboardPage({super.key, required this.onNavigate});
+  const DashboardPage({
+    super.key,
+    required this.onNavigate,
+    this.active = true,
+  });
   final void Function(int tabIndex) onNavigate;
+
+  /// `false` quand un autre onglet est affiché : met en pause le défilement
+  /// du bandeau (sinon il tourne + charge des images pour rien).
+  final bool active;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -32,8 +40,12 @@ class DashboardPage extends ConsumerWidget {
       null => const _NoSource(),
       AsyncError(:final error) => _Error(message: '$error'),
       AsyncLoading() => const LoadingView(label: 'Chargement du catalogue…'),
-      AsyncData(:final value) =>
-        _Dashboard(playlist: value, sourceId: source!.id, onNavigate: onNavigate),
+      AsyncData(:final value) => _Dashboard(
+          playlist: value,
+          sourceId: source!.id,
+          onNavigate: onNavigate,
+          active: active,
+        ),
       _ => const SizedBox.shrink(),
     };
   }
@@ -44,10 +56,12 @@ class _Dashboard extends ConsumerWidget {
     required this.playlist,
     required this.sourceId,
     required this.onNavigate,
+    required this.active,
   });
   final LoadedPlaylist playlist;
   final String sourceId;
   final void Function(int) onNavigate;
+  final bool active;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -82,7 +96,7 @@ class _Dashboard extends ConsumerWidget {
     return ListView(
       children: [
         if (featured.isNotEmpty)
-          _FeaturedHero(items: featured, sourceId: sourceId),
+          _FeaturedHero(items: featured, sourceId: sourceId, active: active),
         if (resume.isNotEmpty)
           _Rail(
             title: 'Reprendre',
@@ -249,9 +263,14 @@ class _Featured {
 /// enchaîné toutes les 20 s). Une seule affiche est décodée à la fois —
 /// pensé pour les appareils pauvres en RAM (Fire TV Stick).
 class _FeaturedHero extends StatefulWidget {
-  const _FeaturedHero({required this.items, required this.sourceId});
+  const _FeaturedHero({
+    required this.items,
+    required this.sourceId,
+    this.active = true,
+  });
   final List<_Featured> items;
   final String sourceId;
+  final bool active;
 
   @override
   State<_FeaturedHero> createState() => _FeaturedHeroState();
@@ -264,7 +283,20 @@ class _FeaturedHeroState extends State<_FeaturedHero> {
   @override
   void initState() {
     super.initState();
-    if (widget.items.length > 1) {
+    _syncTimer();
+  }
+
+  @override
+  void didUpdateWidget(_FeaturedHero old) {
+    super.didUpdateWidget(old);
+    if (old.active != widget.active || old.items.length != widget.items.length) {
+      _syncTimer();
+    }
+  }
+
+  void _syncTimer() {
+    _timer?.cancel();
+    if (widget.active && widget.items.length > 1) {
       _timer = Timer.periodic(const Duration(seconds: 20), (_) {
         if (mounted) setState(() => _i = (_i + 1) % widget.items.length);
       });
