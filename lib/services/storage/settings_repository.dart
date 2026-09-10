@@ -27,7 +27,7 @@ class AppSettings {
     this.preloadEpg = false,
     this.mergeSimilarCategories = false,
     this.userAgent = '',
-    this.playerBufferMb = 32,
+    this.playerBufferMb = 64,
     this.showWatchedRow = true,
     this.pauseOnBackground = true,
   });

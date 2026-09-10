@@ -170,29 +170,42 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
     _lastCheckedPos = pos;
   }
 
-  /// Réglages bas niveau de libmpv (Android surtout) : media_kit ne les met
-  /// pas par défaut.
-  /// - `hwdec=mediacodec-copy` : décodage vidéo **matériel** via Android
-  ///   MediaCodec — indispensable sur Fire TV Stick (le CPU ne suit pas en
-  ///   décodage logiciel → saccades / buffering permanent).
-  /// - `framedrop=vo` : en retard, on saute des images plutôt que de
-  ///   désynchroniser / bloquer.
-  /// - `vd-lavc-fast` : accélérations tolérées si repli logiciel.
+  /// Réglages bas niveau de libmpv que media_kit ne met pas par défaut —
+  /// approche « IBOGOLD » (gros buffer + décodage matériel + reconnexion).
   void _tuneNativePlayer() {
-    if (!Platform.isAndroid) return;
     final native = _player.platform;
     if (native is! NativePlayer) return;
-    for (final e in const {
-      'hwdec': 'mediacodec-copy',
-      'framedrop': 'vo',
-      'vd-lavc-fast': 'yes',
-      'vd-lavc-skiploopfilter': 'nonkey',
-      // FFmpeg se reconnecte tout seul si le flux HTTP décroche (coupure
-      // réseau, serveur qui lâche la connexion) au lieu de rester bloqué.
+
+    final props = <String, String>{
+      // --- Buffer agressif (équivalent du DefaultLoadControl d'ExoPlayer) :
+      //     on met en cache large et on lit ~30 s d'avance pour encaisser les
+      //     à-coups réseau / serveurs qui limitent le débit.
+      'cache': 'yes',
+      'cache-secs': '30',
+      'demuxer-readahead-secs': '30',
+      // En sous-alimentation, on met en pause et on attend d'avoir remis
+      // ~2 s en réserve avant de repartir : une courte pause nette plutôt
+      // qu'un hoquet permanent.
+      'cache-pause': 'yes',
+      'cache-pause-wait': '2',
+      'cache-pause-initial': 'yes',
+      // FFmpeg se reconnecte tout seul si le flux HTTP décroche.
       'stream-lavf-o':
           'reconnect=1,reconnect_at_eof=1,reconnect_streamed=1,'
               'reconnect_on_network_error=1,reconnect_delay_max=5',
-    }.entries) {
+    };
+    if (Platform.isAndroid) {
+      props.addAll(const {
+        // Décodage vidéo MATÉRIEL (MediaCodec) — le CPU d'un Fire TV Stick
+        // ne suit pas en logiciel (saccades / buffering permanent).
+        'hwdec': 'mediacodec-copy',
+        // En retard : on saute des images plutôt que de désynchroniser.
+        'framedrop': 'vo',
+        'vd-lavc-fast': 'yes',
+        'vd-lavc-skiploopfilter': 'nonkey',
+      });
+    }
+    for (final e in props.entries) {
       native.setProperty(e.key, e.value);
     }
   }
