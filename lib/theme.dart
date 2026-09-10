@@ -11,6 +11,10 @@ const nexoraPink = Color(0xFFE8348C);
 const nexoraPurple = Color(0xFF8B5CF6);
 const nexoraBlue = Color(0xFF2D7DF6);
 
+/// Bleu nuit : fond de l'app en thème sombre + écrans de chargement.
+/// (identique à `@color/nexora_window_bg` côté Android.)
+const nexoraNight = Color(0xFF0B1220);
+
 /// Modes de thème proposés. Un 3ᵉ thème « premium » viendra plus tard ; en
 /// attendant l'UI affiche une option « Bientôt disponible » désactivée.
 enum AppThemeMode { dark, light }
@@ -19,9 +23,8 @@ ThemeData buildAppTheme(AppThemeMode mode) {
   final isLight = mode == AppThemeMode.light;
   final brightness = isLight ? Brightness.light : Brightness.dark;
 
-  final scaffold =
-      isLight ? const Color(0xFFF4F5F8) : const Color(0xFF0D0E13);
-  final surface = isLight ? Colors.white : const Color(0xFF161821);
+  final scaffold = isLight ? const Color(0xFFF4F5F8) : nexoraNight;
+  final surface = isLight ? Colors.white : const Color(0xFF141A28);
   final surfaceHi =
       isLight ? const Color(0xFFE9EAF0) : const Color(0xFF20222E);
 
@@ -79,11 +82,22 @@ ThemeData buildAppTheme(AppThemeMode mode) {
       elevation: 0,
     ),
     navigationRailTheme: NavigationRailThemeData(
-      backgroundColor: scaffold,
-      indicatorColor: nexoraPurple.withValues(alpha: .22),
-      selectedIconTheme: const IconThemeData(color: nexoraPurple),
-      selectedLabelTextStyle: const TextStyle(
-          color: nexoraPurple, fontWeight: FontWeight.w600),
+      backgroundColor: isLight ? scaffold : const Color(0xFF0E1526),
+      indicatorColor: nexoraPurple.withValues(alpha: .30),
+      indicatorShape: const StadiumBorder(),
+      selectedIconTheme: IconThemeData(
+          color: isLight ? nexoraPurple : Colors.white),
+      unselectedIconTheme: IconThemeData(
+          color: (isLight ? Colors.black : Colors.white)
+              .withValues(alpha: .55)),
+      selectedLabelTextStyle: TextStyle(
+          color: isLight ? nexoraPurple : Colors.white,
+          fontWeight: FontWeight.w700,
+          fontSize: 11),
+      unselectedLabelTextStyle: TextStyle(
+          color: (isLight ? Colors.black : Colors.white)
+              .withValues(alpha: .55),
+          fontSize: 11),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: surface,

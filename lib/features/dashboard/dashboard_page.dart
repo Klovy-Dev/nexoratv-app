@@ -12,6 +12,7 @@ import '../../state/favorites_provider.dart';
 import '../../state/settings_provider.dart';
 import '../../state/sources_provider.dart';
 import '../../state/watch_history_provider.dart';
+import '../../theme.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/nav.dart';
 import '../../widgets/tv_focusable.dart';
@@ -39,7 +40,10 @@ class DashboardPage extends ConsumerWidget {
     return switch (pl) {
       null => const _NoSource(),
       AsyncError(:final error) => _Error(message: '$error'),
-      AsyncLoading() => const LoadingView(label: 'Chargement du catalogue…'),
+      AsyncLoading() => const ColoredBox(
+          color: nexoraNight,
+          child: LoadingView(label: 'Chargement du catalogue…'),
+        ),
       AsyncData(:final value) => _Dashboard(
           playlist: value,
           sourceId: source!.id,
@@ -51,7 +55,7 @@ class DashboardPage extends ConsumerWidget {
   }
 }
 
-class _Dashboard extends ConsumerWidget {
+class _Dashboard extends ConsumerStatefulWidget {
   const _Dashboard({
     required this.playlist,
     required this.sourceId,
@@ -64,7 +68,34 @@ class _Dashboard extends ConsumerWidget {
   final bool active;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_Dashboard> createState() => _DashboardState();
+}
+
+class _DashboardState extends ConsumerState<_Dashboard> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Le bandeau (tout en haut) a repris le focus : on remonte pour le
+  /// montrer en entier (sinon en revenant des rangées on ne le voit plus).
+  void _revealHero() {
+    if (_scroll.hasClients && _scroll.offset > 0) {
+      _scroll.animateTo(0,
+          duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
+    }
+  }
+
+  LoadedPlaylist get playlist => widget.playlist;
+  String get sourceId => widget.sourceId;
+  void Function(int) get onNavigate => widget.onNavigate;
+  bool get active => widget.active;
+
+  @override
+  Widget build(BuildContext context) {
     final resume = ref
         .watch(continueWatchingProvider)
         .where((e) => e.sourceId == sourceId)
@@ -94,9 +125,15 @@ class _Dashboard extends ConsumerWidget {
     );
 
     return ListView(
+      controller: _scroll,
       children: [
         if (featured.isNotEmpty)
-          _FeaturedHero(items: featured, sourceId: sourceId, active: active),
+          _FeaturedHero(
+            items: featured,
+            sourceId: sourceId,
+            active: active,
+            onFocused: _revealHero,
+          ),
         if (resume.isNotEmpty)
           _Rail(
             title: 'Reprendre',
@@ -267,10 +304,15 @@ class _FeaturedHero extends StatefulWidget {
     required this.items,
     required this.sourceId,
     this.active = true,
+    this.onFocused,
   });
   final List<_Featured> items;
   final String sourceId;
   final bool active;
+
+  /// Appelé quand un bouton du bandeau prend le focus (D-pad) : le parent
+  /// remonte la liste pour montrer le bandeau en entier.
+  final VoidCallback? onFocused;
 
   @override
   State<_FeaturedHero> createState() => _FeaturedHeroState();
@@ -416,37 +458,45 @@ class _FeaturedHeroState extends State<_FeaturedHero> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                Row(
-                  children: [
-                    FilledButton.icon(
-                      autofocus: true,
-                      onPressed: () {
-                        if (item.isSeries) {
-                          _open(item);
-                        } else {
-                          pushFade(
-                            context,
-                            PlayerScreen(
-                              sourceId: widget.sourceId,
-                              playlist: [item.movie!],
-                              startIndex: 0,
-                            ),
-                          );
-                        }
-                      },
-                      icon: Icon(
-                          item.isSeries ? Icons.visibility : Icons.play_arrow),
-                      label: Text(item.isSeries ? 'Voir' : 'Lecture'),
-                    ),
-                    if (!item.isSeries) ...[
-                      const SizedBox(width: 10),
-                      OutlinedButton.icon(
-                        onPressed: () => _open(item),
-                        icon: const Icon(Icons.info_outline),
-                        label: const Text('Infos'),
+                Focus(
+                  canRequestFocus: false,
+                  skipTraversal: true,
+                  onFocusChange: (f) {
+                    if (f) widget.onFocused?.call();
+                  },
+                  child: Row(
+                    children: [
+                      FilledButton.icon(
+                        autofocus: true,
+                        onPressed: () {
+                          if (item.isSeries) {
+                            _open(item);
+                          } else {
+                            pushFade(
+                              context,
+                              PlayerScreen(
+                                sourceId: widget.sourceId,
+                                playlist: [item.movie!],
+                                startIndex: 0,
+                              ),
+                            );
+                          }
+                        },
+                        icon: Icon(item.isSeries
+                            ? Icons.visibility
+                            : Icons.play_arrow),
+                        label: Text(item.isSeries ? 'Voir' : 'Lecture'),
                       ),
+                      if (!item.isSeries) ...[
+                        const SizedBox(width: 10),
+                        OutlinedButton.icon(
+                          onPressed: () => _open(item),
+                          icon: const Icon(Icons.info_outline),
+                          label: const Text('Infos'),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Row(

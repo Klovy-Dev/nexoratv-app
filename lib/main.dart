@@ -96,6 +96,7 @@ class NexoraApp extends ConsumerWidget {
 }
 
 /// Retire l'écran de démarrage natif une fois la première frame rendue.
+/// Le fond reste bleu nuit tout du long (aucun flash blanc / noir).
 class _SplashGate extends StatefulWidget {
   const _SplashGate({required this.child});
   final Widget child;
@@ -114,5 +115,8 @@ class _SplashGateState extends State<_SplashGate> {
   }
 
   @override
-  Widget build(BuildContext context) => widget.child;
+  Widget build(BuildContext context) => ColoredBox(
+        color: nexoraNight,
+        child: widget.child,
+      );
 }

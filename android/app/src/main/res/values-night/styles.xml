@@ -8,7 +8,7 @@
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
-        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowBackground">@color/nexora_window_bg</item>
         <item name="android:forceDarkAllowed">false</item>
     </style>
 </resources>

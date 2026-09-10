@@ -80,6 +80,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
     super.initState();
     _index = widget.startIndex.clamp(0, widget.playlist.length - 1);
     if (ref.read(settingsValueProvider).keepScreenAwake) WakelockPlus.enable();
+    _tuneNativePlayer();
 
     // Protection multi-écran : pause quand l'app passe en arrière-plan
     // (utile pour les abonnements limités à 1 connexion simultanée).
@@ -133,6 +134,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with RouteAware {
 
     _openCurrent();
     _scheduleHide();
+  }
+
+  /// Réglages bas niveau de libmpv (Android surtout) : media_kit ne les met
+  /// pas par défaut.
+  /// - `hwdec=mediacodec-copy` : décodage vidéo **matériel** via Android
+  ///   MediaCodec — indispensable sur Fire TV Stick (le CPU ne suit pas en
+  ///   décodage logiciel → saccades / buffering permanent).
+  /// - `framedrop=vo` : en retard, on saute des images plutôt que de
+  ///   désynchroniser / bloquer.
+  /// - `vd-lavc-fast` : accélérations tolérées si repli logiciel.
+  void _tuneNativePlayer() {
+    if (!Platform.isAndroid) return;
+    final native = _player.platform;
+    if (native is! NativePlayer) return;
+    for (final e in const {
+      'hwdec': 'mediacodec-copy',
+      'framedrop': 'vo',
+      'vd-lavc-fast': 'yes',
+      'vd-lavc-skiploopfilter': 'nonkey',
+    }.entries) {
+      native.setProperty(e.key, e.value);
+    }
   }
 
   /// Sur la 2ᵉ tentative d'une chaîne live, on inverse .ts <-> .m3u8
