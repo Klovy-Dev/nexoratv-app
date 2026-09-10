@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Fond de l'icône adaptative (généré par flutter_launcher_icons). -->
+    <color name="ic_launcher_background">#000000</color>
     <!-- Fond de fenêtre NexoraTV : bleu nuit (visible au démarrage avant la
          première frame Flutter, et derrière l'UI). -->
     <color name="nexora_window_bg">#FF0B1220</color>
