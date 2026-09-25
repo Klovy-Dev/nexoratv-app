@@ -45,8 +45,17 @@ ThemeData buildTheme() {
     splashFactory: InkSparkle.splashFactory,
   );
 
-  TextStyle? display(TextStyle? s, {double? size, FontWeight weight = FontWeight.w700}) =>
-      s?.copyWith(fontFamily: Nx.display, fontWeight: weight, fontSize: size, color: Nx.text, letterSpacing: -0.4);
+  TextStyle? display(
+    TextStyle? s, {
+    double? size,
+    FontWeight weight = FontWeight.w700,
+  }) => s?.copyWith(
+    fontFamily: Nx.display,
+    fontWeight: weight,
+    fontSize: size,
+    color: Nx.text,
+    letterSpacing: -0.4,
+  );
 
   final text = base.textTheme.apply(bodyColor: Nx.text, displayColor: Nx.text);
   const stadium = StadiumBorder();
@@ -62,7 +71,11 @@ ThemeData buildTheme() {
       bodyMedium: text.bodyMedium?.copyWith(height: 1.5),
       bodySmall: text.bodySmall?.copyWith(color: Nx.muted),
     ),
-    dividerTheme: const DividerThemeData(color: Nx.border, space: 1, thickness: 1),
+    dividerTheme: const DividerThemeData(
+      color: Nx.border,
+      space: 1,
+      thickness: 1,
+    ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: Nx.accent,
@@ -70,7 +83,11 @@ ThemeData buildTheme() {
         disabledBackgroundColor: Nx.accent.withValues(alpha: 0.4),
         shape: stadium,
         padding: padding,
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, fontFamily: 'Manrope'),
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 15,
+          fontFamily: 'Manrope',
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -79,7 +96,11 @@ ThemeData buildTheme() {
         side: const BorderSide(color: Nx.borderStrong),
         shape: stadium,
         padding: padding,
-        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, fontFamily: 'Manrope'),
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 15,
+          fontFamily: 'Manrope',
+        ),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
@@ -115,12 +136,17 @@ ThemeData buildTheme() {
       thickness: const WidgetStatePropertyAll(6),
     ),
     tooltipTheme: const TooltipThemeData(
-      decoration: BoxDecoration(color: Nx.surface2, borderRadius: BorderRadius.all(Radius.circular(8))),
+      decoration: BoxDecoration(
+        color: Nx.surface2,
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+      ),
       textStyle: TextStyle(color: Nx.text, fontSize: 12),
     ),
-    pageTransitionsTheme: const PageTransitionsTheme(builders: {
-      TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
-      TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
-    }),
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+      },
+    ),
   );
 }

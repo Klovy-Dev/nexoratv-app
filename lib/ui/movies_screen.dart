@@ -12,18 +12,28 @@ class MoviesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final categories = ref.watch(movieCategoriesProvider).value ?? const <Category>[];
-    return ref.watch(moviesProvider).when(
+    final categories =
+        ref.watch(movieCategoriesProvider).value ?? const <Category>[];
+    return ref
+        .watch(moviesProvider)
+        .when(
           loading: () => const LoadingView(label: 'Chargement des films…'),
           error: (e, _) => MessageView(
             icon: Icons.wifi_off_rounded,
             title: 'Films indisponibles',
             message: errorText(e),
-            action: FilledButton(onPressed: () => ref.invalidate(moviesProvider), child: const Text('Réessayer')),
+            action: FilledButton(
+              onPressed: () => ref.invalidate(moviesProvider),
+              child: const Text('Réessayer'),
+            ),
           ),
           data: (movies) {
             if (movies.isEmpty) {
-              return const MessageView(icon: Icons.movie_outlined, title: 'Aucun film', message: 'Cette source ne propose pas de films.');
+              return const MessageView(
+                icon: Icons.movie_outlined,
+                title: 'Aucun film',
+                message: 'Cette source ne propose pas de films.',
+              );
             }
             final byId = {for (final m in movies) m.id: m};
             return PosterCatalog(
@@ -32,10 +42,19 @@ class MoviesScreen extends ConsumerWidget {
               categories: categories,
               items: [
                 for (final m in movies)
-                  PosterItem(id: m.id, title: m.name, categoryId: m.categoryId, image: m.poster, subtitle: m.year, rating: m.rating),
+                  PosterItem(
+                    id: m.id,
+                    title: m.name,
+                    categoryId: m.categoryId,
+                    image: m.poster,
+                    subtitle: m.year,
+                    rating: m.rating,
+                  ),
               ],
               onOpen: (item) => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => MovieDetailPage(movie: byId[item.id]!)),
+                MaterialPageRoute(
+                  builder: (_) => MovieDetailPage(movie: byId[item.id]!),
+                ),
               ),
             );
           },
@@ -62,19 +81,32 @@ class MovieDetailPage extends ConsumerWidget {
               image: movie.poster,
               backdrop: d?.backdrop,
               meta: [
-                if (d?.releaseDate != null) d!.releaseDate!.split('-').first else if (movie.year != null) movie.year!,
+                if (d?.releaseDate != null)
+                  d!.releaseDate!.split('-').first
+                else if (movie.year != null)
+                  movie.year!,
                 if (d?.duration != null) d!.duration!,
                 if (d?.genre != null) d!.genre!,
-                if (movie.rating != null && movie.rating! > 0) '★ ${movie.rating!.toStringAsFixed(1)}',
+                if (movie.rating != null && movie.rating! > 0)
+                  '★ ${movie.rating!.toStringAsFixed(1)}',
               ],
-              plot: [
-                if (d?.plot != null) d!.plot!,
-                if (d?.director != null) 'Réalisation : ${d!.director}',
-                if (d?.cast != null) 'Avec : ${d!.cast}',
-              ].join('\n\n').ifEmpty(snap.connectionState == ConnectionState.waiting ? 'Chargement du résumé…' : null),
+              plot:
+                  [
+                        if (d?.plot != null) d!.plot!,
+                        if (d?.director != null) 'Réalisation : ${d!.director}',
+                        if (d?.cast != null) 'Avec : ${d!.cast}',
+                      ]
+                      .join('\n\n')
+                      .ifEmpty(
+                        snap.connectionState == ConnectionState.waiting
+                            ? 'Chargement du résumé…'
+                            : null,
+                      ),
               actions: [
                 FilledButton.icon(
-                  onPressed: () => PlayerPage.open(context, [PlayItem(movie.name, movie.url)]),
+                  onPressed: () => PlayerPage.open(context, [
+                    PlayItem(movie.name, movie.url),
+                  ]),
                   icon: const Icon(Icons.play_arrow_rounded),
                   label: const Text('Lecture'),
                 ),

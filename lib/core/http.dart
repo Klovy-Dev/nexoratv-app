@@ -18,27 +18,28 @@ Future<http.Response> httpGet(
   Uri uri, {
   Map<String, String>? headers,
   Duration timeout = const Duration(seconds: 30),
-}) =>
-    _guard(() => http.get(uri, headers: {'User-Agent': kUserAgent, ...?headers}), timeout);
+}) => _guard(
+  () => http.get(uri, headers: {'User-Agent': kUserAgent, ...?headers}),
+  timeout,
+);
 
 Future<http.Response> httpPostJson(
   Uri uri,
   String body, {
   Map<String, String>? headers,
   Duration timeout = const Duration(seconds: 20),
-}) =>
-    _guard(
-      () => http.post(
-        uri,
-        headers: {
-          'User-Agent': kUserAgent,
-          'Content-Type': 'application/json',
-          ...?headers,
-        },
-        body: body,
-      ),
-      timeout,
-    );
+}) => _guard(
+  () => http.post(
+    uri,
+    headers: {
+      'User-Agent': kUserAgent,
+      'Content-Type': 'application/json',
+      ...?headers,
+    },
+    body: body,
+  ),
+  timeout,
+);
 
 Future<http.Response> _guard(
   Future<http.Response> Function() send,
@@ -49,7 +50,9 @@ Future<http.Response> _guard(
   } on TimeoutException {
     throw AppException('Le serveur ne répond pas (délai dépassé).');
   } on SocketException {
-    throw AppException('Connexion impossible : vérifiez votre accès à Internet.');
+    throw AppException(
+      'Connexion impossible : vérifiez votre accès à Internet.',
+    );
   } on HandshakeException {
     throw AppException('Connexion sécurisée impossible avec ce serveur.');
   } on http.ClientException {
@@ -67,9 +70,12 @@ class Memo<T> {
     if (existing != null) return existing;
     final future = load();
     _future = future;
-    future.then((_) {}, onError: (Object _) {
-      if (identical(_future, future)) _future = null;
-    });
+    future.then(
+      (_) {},
+      onError: (Object _) {
+        if (identical(_future, future)) _future = null;
+      },
+    );
     return future;
   }
 }

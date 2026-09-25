@@ -13,21 +13,35 @@ class SessionExpired extends AppException {
 class AccountApi {
   static Uri _uri(String path) => Uri.parse('$kApiBase$path');
 
-  static Future<(String token, AccountUser user)> login(String email, String password) async {
+  static Future<(String token, AccountUser user)> login(
+    String email,
+    String password,
+  ) async {
     final res = await httpPostJson(
       _uri('/api/app/login'),
       jsonEncode({'email': email.trim(), 'password': password}),
     );
     final body = _decode(res.body);
     if (res.statusCode != 200) {
-      throw AppException(body['message'] as String? ?? 'Connexion impossible (${res.statusCode}).');
+      throw AppException(
+        body['message'] as String? ??
+            'Connexion impossible (${res.statusCode}).',
+      );
     }
     final user = body['user'] as Map<String, Object?>;
-    return (body['token'] as String, AccountUser(user['name'] as String, user['email'] as String));
+    return (
+      body['token'] as String,
+      AccountUser(user['name'] as String, user['email'] as String),
+    );
   }
 
-  static Future<(AccountUser user, List<AccountSubscription> subs)> me(String token) async {
-    final res = await httpGet(_uri('/api/app/me'), headers: {'Authorization': 'Bearer $token'});
+  static Future<(AccountUser user, List<AccountSubscription> subs)> me(
+    String token,
+  ) async {
+    final res = await httpGet(
+      _uri('/api/app/me'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
     if (res.statusCode == 401) throw SessionExpired();
     if (res.statusCode != 200) {
       throw AppException('Le site NexoraTV ne répond pas (${res.statusCode}).');

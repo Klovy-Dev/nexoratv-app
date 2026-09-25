@@ -20,38 +20,49 @@ class M3uContent implements ContentSource {
   /// Vérifie qu'une URL renvoie bien une playlist exploitable.
   static Future<int> verify(Source source) async {
     final catalog = await M3uContent(source)._load();
-    final total = catalog.channels.length + catalog.movies.length + catalog.series.length;
-    if (total == 0) throw AppException('Aucune chaîne trouvée dans cette playlist.');
+    final total =
+        catalog.channels.length + catalog.movies.length + catalog.series.length;
+    if (total == 0) {
+      throw AppException('Aucune chaîne trouvée dans cette playlist.');
+    }
     return total;
   }
 
   Future<M3uCatalog> _load() => _data(() async {
-        final url = source.m3uUrl?.trim() ?? '';
-        final uri = Uri.tryParse(url);
-        if (uri == null || !uri.hasScheme) throw AppException('URL de playlist invalide.');
-        final res = await httpGet(uri, timeout: const Duration(seconds: 120));
-        if (res.statusCode != 200) {
-          throw AppException('Le serveur a répondu une erreur (${res.statusCode}).');
-        }
-        return _parseInBackground(res.bodyBytes);
-      });
+    final url = source.m3uUrl?.trim() ?? '';
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme) {
+      throw AppException('URL de playlist invalide.');
+    }
+    final res = await httpGet(uri, timeout: const Duration(seconds: 120));
+    if (res.statusCode != 200) {
+      throw AppException(
+        'Le serveur a répondu une erreur (${res.statusCode}).',
+      );
+    }
+    return _parseInBackground(res.bodyBytes);
+  });
 
   @override
-  Future<List<Category>> liveCategories() async => (await _load()).liveCategories;
+  Future<List<Category>> liveCategories() async =>
+      (await _load()).liveCategories;
   @override
   Future<List<LiveChannel>> liveChannels() async => (await _load()).channels;
   @override
-  Future<List<Category>> movieCategories() async => (await _load()).movieCategories;
+  Future<List<Category>> movieCategories() async =>
+      (await _load()).movieCategories;
   @override
   Future<List<Movie>> movies() async => (await _load()).movies;
   @override
   Future<MovieDetails?> movieDetails(Movie movie) async => null;
   @override
-  Future<List<Category>> seriesCategories() async => (await _load()).seriesCategories;
+  Future<List<Category>> seriesCategories() async =>
+      (await _load()).seriesCategories;
   @override
   Future<List<Series>> series() async => (await _load()).series;
   @override
-  Future<List<Season>> seasons(Series series) async => groupSeasons(series.episodes ?? const []);
+  Future<List<Season>> seasons(Series series) async =>
+      groupSeasons(series.episodes ?? const []);
 }
 
 class M3uCatalog {
@@ -78,8 +89,14 @@ Future<M3uCatalog> _parseInBackground(List<int> bytes) =>
     Isolate.run(() => parseM3u(utf8.decode(bytes, allowMalformed: true)));
 
 final _attr = RegExp(r'([\w-]+)="([^"]*)"');
-final _episodeTag = RegExp(r'^(.*?)[\s._-]*S(\d{1,2})[\s._-]*E(\d{1,3})\b', caseSensitive: false);
-final _videoFile = RegExp(r'\.(mp4|mkv|avi|mov|wmv|m4v)(\?|$)', caseSensitive: false);
+final _episodeTag = RegExp(
+  r'^(.*?)[\s._-]*S(\d{1,2})[\s._-]*E(\d{1,3})\b',
+  caseSensitive: false,
+);
+final _videoFile = RegExp(
+  r'\.(mp4|mkv|avi|mov|wmv|m4v)(\?|$)',
+  caseSensitive: false,
+);
 
 M3uCatalog parseM3u(String text) {
   final liveCats = <String>{}, movieCats = <String>{}, seriesCats = <String>{};
@@ -95,7 +112,10 @@ M3uCatalog parseM3u(String text) {
     if (line.isEmpty) continue;
 
     if (line.startsWith('#EXTINF')) {
-      final attrs = {for (final m in _attr.allMatches(line)) m.group(1)!.toLowerCase(): m.group(2)!};
+      final attrs = {
+        for (final m in _attr.allMatches(line))
+          m.group(1)!.toLowerCase(): m.group(2)!,
+      };
       final lastQuote = line.lastIndexOf('"');
       final comma = line.indexOf(',', lastQuote < 0 ? 0 : lastQuote);
       name = comma < 0 ? null : line.substring(comma + 1).trim();
@@ -120,21 +140,32 @@ M3uCatalog parseM3u(String text) {
     if (lower.contains('/series/')) {
       seriesCats.add(cat);
       final m = _episodeTag.firstMatch(title);
-      final show = (m?.group(1)?.trim().isNotEmpty ?? false) ? m!.group(1)!.trim() : title;
-      final acc = seriesMap.putIfAbsent('$cat|$show', () => _SeriesAcc(show, cat, logo));
-      acc.episodes.add(Episode(
-        id: id,
-        title: title,
-        season: int.tryParse(m?.group(2) ?? '') ?? 1,
-        number: int.tryParse(m?.group(3) ?? '') ?? acc.episodes.length + 1,
-        url: url,
-      ));
+      final show = (m?.group(1)?.trim().isNotEmpty ?? false)
+          ? m!.group(1)!.trim()
+          : title;
+      final acc = seriesMap.putIfAbsent(
+        '$cat|$show',
+        () => _SeriesAcc(show, cat, logo),
+      );
+      acc.episodes.add(
+        Episode(
+          id: id,
+          title: title,
+          season: int.tryParse(m?.group(2) ?? '') ?? 1,
+          number: int.tryParse(m?.group(3) ?? '') ?? acc.episodes.length + 1,
+          url: url,
+        ),
+      );
     } else if (lower.contains('/movie/') || _videoFile.hasMatch(lower)) {
       movieCats.add(cat);
-      movies.add(Movie(id: id, name: title, categoryId: cat, url: url, poster: logo));
+      movies.add(
+        Movie(id: id, name: title, categoryId: cat, url: url, poster: logo),
+      );
     } else {
       liveCats.add(cat);
-      channels.add(LiveChannel(id: id, name: title, categoryId: cat, url: url, logo: logo));
+      channels.add(
+        LiveChannel(id: id, name: title, categoryId: cat, url: url, logo: logo),
+      );
     }
     name = logo = group = null;
   }

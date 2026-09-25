@@ -32,30 +32,30 @@ class Source {
   final bool active;
 
   Map<String, Object?> toJson() => {
-        'id': id,
-        'name': name,
-        'kind': kind.name,
-        'serverUrl': serverUrl,
-        'username': username,
-        'password': password,
-        'm3uUrl': m3uUrl,
-        'fromAccount': fromAccount,
-        'expiresAt': expiresAt,
-        'active': active,
-      };
+    'id': id,
+    'name': name,
+    'kind': kind.name,
+    'serverUrl': serverUrl,
+    'username': username,
+    'password': password,
+    'm3uUrl': m3uUrl,
+    'fromAccount': fromAccount,
+    'expiresAt': expiresAt,
+    'active': active,
+  };
 
   factory Source.fromJson(Map<String, Object?> j) => Source(
-        id: j['id'] as String,
-        name: j['name'] as String? ?? 'Source',
-        kind: j['kind'] == 'm3u' ? SourceKind.m3u : SourceKind.xtream,
-        serverUrl: j['serverUrl'] as String?,
-        username: j['username'] as String?,
-        password: j['password'] as String?,
-        m3uUrl: j['m3uUrl'] as String?,
-        fromAccount: j['fromAccount'] as bool? ?? false,
-        expiresAt: j['expiresAt'] as String?,
-        active: j['active'] as bool? ?? true,
-      );
+    id: j['id'] as String,
+    name: j['name'] as String? ?? 'Source',
+    kind: j['kind'] == 'm3u' ? SourceKind.m3u : SourceKind.xtream,
+    serverUrl: j['serverUrl'] as String?,
+    username: j['username'] as String?,
+    password: j['password'] as String?,
+    m3uUrl: j['m3uUrl'] as String?,
+    fromAccount: j['fromAccount'] as bool? ?? false,
+    expiresAt: j['expiresAt'] as String?,
+    active: j['active'] as bool? ?? true,
+  );
 
   /// Deux sources identiques pointent vers le même contenu.
   @override
@@ -69,7 +69,8 @@ class Source {
       other.m3uUrl == m3uUrl;
 
   @override
-  int get hashCode => Object.hash(id, kind, serverUrl, username, password, m3uUrl);
+  int get hashCode =>
+      Object.hash(id, kind, serverUrl, username, password, m3uUrl);
 }
 
 class Category {
@@ -208,7 +209,8 @@ class AccountSubscription {
     this.expiresAt,
   });
 
-  factory AccountSubscription.fromJson(Map<String, Object?> j) => AccountSubscription(
+  factory AccountSubscription.fromJson(Map<String, Object?> j) =>
+      AccountSubscription(
         id: (j['id'] as num).toInt(),
         label: j['label'] as String? ?? 'Abonnement',
         playable: j['playable'] == true,
@@ -229,14 +231,14 @@ class AccountSubscription {
   final String? expiresAt;
 
   Source toSource() => Source(
-        id: 'account-$id',
-        name: label,
-        kind: SourceKind.xtream,
-        serverUrl: serverUrl,
-        username: username,
-        password: password,
-        fromAccount: true,
-        expiresAt: expiresAt,
-        active: active,
-      );
+    id: 'account-$id',
+    name: label,
+    kind: SourceKind.xtream,
+    serverUrl: serverUrl,
+    username: username,
+    password: password,
+    fromAccount: true,
+    expiresAt: expiresAt,
+    active: active,
+  );
 }

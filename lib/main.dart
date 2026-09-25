@@ -13,13 +13,15 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
-  runApp(ProviderScope(
-    overrides: [prefsProvider.overrideWithValue(prefs)],
-    // Pas de nouvelle tentative automatique des chargements en erreur : les
-    // écrans proposent un bouton « Réessayer ».
-    retry: (_, _) => null,
-    child: const NexoraApp(),
-  ));
+  runApp(
+    ProviderScope(
+      overrides: [prefsProvider.overrideWithValue(prefs)],
+      // Pas de nouvelle tentative automatique des chargements en erreur : les
+      // écrans proposent un bouton « Réessayer ».
+      retry: (_, _) => null,
+      child: const NexoraApp(),
+    ),
+  );
 }
 
 class NexoraApp extends StatelessWidget {
@@ -27,11 +29,11 @@ class NexoraApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'NexoraTV',
-        debugShowCheckedModeBanner: false,
-        theme: buildTheme(),
-        home: const _Root(),
-      );
+    title: 'NexoraTV',
+    debugShowCheckedModeBanner: false,
+    theme: buildTheme(),
+    home: const _Root(),
+  );
 }
 
 class _Root extends ConsumerWidget {

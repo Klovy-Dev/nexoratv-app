@@ -42,15 +42,14 @@ class AppState {
     List<Source>? sources,
     String? Function()? activeId,
     String? Function()? accountError,
-  }) =>
-      AppState(
-        ready: ready ?? this.ready,
-        token: token != null ? token() : this.token,
-        user: user != null ? user() : this.user,
-        sources: sources ?? this.sources,
-        activeId: activeId != null ? activeId() : this.activeId,
-        accountError: accountError != null ? accountError() : this.accountError,
-      );
+  }) => AppState(
+    ready: ready ?? this.ready,
+    token: token != null ? token() : this.token,
+    user: user != null ? user() : this.user,
+    sources: sources ?? this.sources,
+    activeId: activeId != null ? activeId() : this.activeId,
+    accountError: accountError != null ? accountError() : this.accountError,
+  );
 }
 
 class AppController extends Notifier<AppState> {
@@ -80,7 +79,11 @@ class AppController extends Notifier<AppState> {
   Future<void> login(String email, String password) async {
     final (token, user) = await AccountApi.login(email, password);
     await Storage.saveAccount(token, user);
-    state = state.copyWith(token: () => token, user: () => user, accountError: () => null);
+    state = state.copyWith(
+      token: () => token,
+      user: () => user,
+      accountError: () => null,
+    );
     await syncAccount(throwOnError: true);
   }
 
@@ -134,12 +137,16 @@ class AppController extends Notifier<AppState> {
     final keepActive = sources.any((s) => s.id == state.activeId);
     state = state.copyWith(
       sources: sources,
-      activeId: keepActive ? null : () => sources.isEmpty ? null : sources.first.id,
+      activeId: keepActive
+          ? null
+          : () => sources.isEmpty ? null : sources.first.id,
     );
   }
 }
 
-final appProvider = NotifierProvider<AppController, AppState>(AppController.new);
+final appProvider = NotifierProvider<AppController, AppState>(
+  AppController.new,
+);
 
 /// Catalogue de la source active (recréé seulement si la source change).
 final contentProvider = Provider<ContentSource?>((ref) {
@@ -153,9 +160,17 @@ ContentSource _content(Ref ref) {
   return content;
 }
 
-final liveCategoriesProvider = FutureProvider((ref) => _content(ref).liveCategories());
-final liveChannelsProvider = FutureProvider((ref) => _content(ref).liveChannels());
-final movieCategoriesProvider = FutureProvider((ref) => _content(ref).movieCategories());
+final liveCategoriesProvider = FutureProvider(
+  (ref) => _content(ref).liveCategories(),
+);
+final liveChannelsProvider = FutureProvider(
+  (ref) => _content(ref).liveChannels(),
+);
+final movieCategoriesProvider = FutureProvider(
+  (ref) => _content(ref).movieCategories(),
+);
 final moviesProvider = FutureProvider((ref) => _content(ref).movies());
-final seriesCategoriesProvider = FutureProvider((ref) => _content(ref).seriesCategories());
+final seriesCategoriesProvider = FutureProvider(
+  (ref) => _content(ref).seriesCategories(),
+);
 final seriesProvider = FutureProvider((ref) => _content(ref).series());

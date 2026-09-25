@@ -22,17 +22,23 @@ class Settings {
   /// Passer en plein écran dès qu'on lance une chaîne.
   final bool startLiveFullscreen;
 
-  Settings copyWith({LiveFormat? liveFormat, int? bufferMb, bool? hardwareDecoding, bool? startLiveFullscreen}) =>
-      Settings(
-        liveFormat: liveFormat ?? this.liveFormat,
-        bufferMb: bufferMb ?? this.bufferMb,
-        hardwareDecoding: hardwareDecoding ?? this.hardwareDecoding,
-        startLiveFullscreen: startLiveFullscreen ?? this.startLiveFullscreen,
-      );
+  Settings copyWith({
+    LiveFormat? liveFormat,
+    int? bufferMb,
+    bool? hardwareDecoding,
+    bool? startLiveFullscreen,
+  }) => Settings(
+    liveFormat: liveFormat ?? this.liveFormat,
+    bufferMb: bufferMb ?? this.bufferMb,
+    hardwareDecoding: hardwareDecoding ?? this.hardwareDecoding,
+    startLiveFullscreen: startLiveFullscreen ?? this.startLiveFullscreen,
+  );
 }
 
 /// Préférences chargées avant le démarrage (voir main.dart).
-final prefsProvider = Provider<SharedPreferences>((_) => throw UnimplementedError('prefsProvider non initialisé'));
+final prefsProvider = Provider<SharedPreferences>(
+  (_) => throw UnimplementedError('prefsProvider non initialisé'),
+);
 
 class SettingsController extends Notifier<Settings> {
   static const _kFormat = 'live_format';
@@ -46,7 +52,9 @@ class SettingsController extends Notifier<Settings> {
   Settings build() {
     final p = ref.read(prefsProvider);
     return Settings(
-      liveFormat: p.getString(_kFormat) == 'hls' ? LiveFormat.hls : LiveFormat.ts,
+      liveFormat: p.getString(_kFormat) == 'hls'
+          ? LiveFormat.hls
+          : LiveFormat.ts,
       bufferMb: p.getInt(_kBuffer) ?? 64,
       hardwareDecoding: p.getBool(_kHwdec) ?? true,
       startLiveFullscreen: p.getBool(_kLiveFullscreen) ?? false,
@@ -81,4 +89,6 @@ class SettingsController extends Notifier<Settings> {
   }
 }
 
-final settingsProvider = NotifierProvider<SettingsController, Settings>(SettingsController.new);
+final settingsProvider = NotifierProvider<SettingsController, Settings>(
+  SettingsController.new,
+);

@@ -7,9 +7,9 @@ import 'xtream.dart';
 /// appli).
 abstract class ContentSource {
   factory ContentSource.of(Source source) => switch (source.kind) {
-        SourceKind.xtream => XtreamContent(source),
-        SourceKind.m3u => M3uContent(source),
-      };
+    SourceKind.xtream => XtreamContent(source),
+    SourceKind.m3u => M3uContent(source),
+  };
 
   Future<List<Category>> liveCategories();
   Future<List<LiveChannel>> liveChannels();
