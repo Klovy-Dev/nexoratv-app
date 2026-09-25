@@ -42,6 +42,7 @@ dependencies:
   shared_preferences: ^2.5.5
   flutter_secure_storage: ^11.2.0
   cached_network_image: ^4.0.2
+  flutter_cache_manager: ^3.4.5
 
 dev_dependencies:
   flutter_test:

@@ -8,6 +8,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../core/models.dart';
 import '../state/app_state.dart';
+import '../state/settings.dart';
 import 'player.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -23,8 +24,9 @@ class LiveScreen extends ConsumerStatefulWidget {
 }
 
 class _LiveScreenState extends ConsumerState<LiveScreen> {
-  late final Player _player = createPlayer();
-  late final VideoController _video = VideoController(_player);
+  late final (Player, VideoController) _pc = createPlayer(ref.read(settingsProvider));
+  Player get _player => _pc.$1;
+  VideoController get _video => _pc.$2;
   final _videoKey = GlobalKey<VideoState>();
   StreamSubscription<String>? _errors;
 
@@ -52,11 +54,16 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
   }
 
   void _play(LiveChannel channel) {
+    final settings = ref.read(settingsProvider);
+    final first = _current == null;
     setState(() {
       _current = channel;
       _failed = false;
     });
-    _player.open(Media(channel.url));
+    _player.open(Media(liveUrl(channel.url, settings.liveFormat)));
+    if (first && settings.startLiveFullscreen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _videoKey.currentState?.enterFullscreen());
+    }
   }
 
   void _zap(int delta) {

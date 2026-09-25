@@ -1,15 +1,32 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../state/settings.dart';
 import 'theme.dart';
 
-/// Lecteur partagé : gros tampon pour encaisser les à-coups des serveurs IPTV.
-Player createPlayer() => Player(
-      configuration: const PlayerConfiguration(bufferSize: 64 * 1024 * 1024, title: 'NexoraTV'),
-    );
+/// Lecteur partagé, réglé selon les paramètres (tampon, décodage matériel).
+(Player, VideoController) createPlayer(Settings settings) {
+  final player = Player(
+    configuration: PlayerConfiguration(bufferSize: settings.bufferMb * 1024 * 1024, title: 'NexoraTV'),
+  );
+  final controller = VideoController(
+    player,
+    configuration: VideoControllerConfiguration(enableHardwareAcceleration: settings.hardwareDecoding),
+  );
+  return (player, controller);
+}
+
+/// URL d'une chaîne selon le format choisi (Xtream : .ts ↔ .m3u8).
+String liveUrl(String url, LiveFormat format) {
+  if (format == LiveFormat.hls && url.contains('/live/') && url.endsWith('.ts')) {
+    return '${url.substring(0, url.length - 3)}.m3u8';
+  }
+  return url;
+}
 
 /// Contrôles desktop aux couleurs NexoraTV.
 MaterialDesktopVideoControlsThemeData playerControlsTheme({
@@ -48,7 +65,7 @@ class PlayItem {
 
 /// Lecture d'un film ou d'une suite d'épisodes (passage automatique au
 /// suivant, boutons précédent / suivant).
-class PlayerPage extends StatefulWidget {
+class PlayerPage extends ConsumerStatefulWidget {
   const PlayerPage({super.key, required this.items, this.index = 0});
 
   final List<PlayItem> items;
@@ -58,12 +75,13 @@ class PlayerPage extends StatefulWidget {
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => PlayerPage(items: items, index: index)));
 
   @override
-  State<PlayerPage> createState() => _PlayerPageState();
+  ConsumerState<PlayerPage> createState() => _PlayerPageState();
 }
 
-class _PlayerPageState extends State<PlayerPage> {
-  late final Player _player = createPlayer();
-  late final VideoController _controller = VideoController(_player);
+class _PlayerPageState extends ConsumerState<PlayerPage> {
+  late final (Player, VideoController) _pc = createPlayer(ref.read(settingsProvider));
+  Player get _player => _pc.$1;
+  VideoController get _controller => _pc.$2;
   late int _index = widget.index;
   final _subs = <StreamSubscription<Object?>>[];
 

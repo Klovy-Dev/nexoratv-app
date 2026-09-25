@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'state/app_state.dart';
+import 'state/settings.dart';
+import 'ui/home_screen.dart';
 import 'ui/onboarding.dart';
-import 'ui/shell.dart';
 import 'ui/theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
-  // Pas de nouvelle tentative automatique des chargements en erreur : les
-  // écrans proposent un bouton « Réessayer ».
-  runApp(ProviderScope(retry: (_, _) => null, child: const NexoraApp()));
+  final prefs = await SharedPreferences.getInstance();
+  runApp(ProviderScope(
+    overrides: [prefsProvider.overrideWithValue(prefs)],
+    // Pas de nouvelle tentative automatique des chargements en erreur : les
+    // écrans proposent un bouton « Réessayer ».
+    retry: (_, _) => null,
+    child: const NexoraApp(),
+  ));
 }
 
 class NexoraApp extends StatelessWidget {
@@ -37,6 +44,6 @@ class _Root extends ConsumerWidget {
       return const Scaffold(body: Center(child: Brand(size: 34)));
     }
     if (!app.loggedIn && app.sources.isEmpty) return const WelcomeScreen();
-    return const Shell();
+    return const HomeScreen();
   }
 }
