@@ -16,6 +16,7 @@ class HoverCard extends StatefulWidget {
     this.padding = EdgeInsets.zero,
     this.selected = false,
     this.lift = 4,
+    this.outlined = true,
   });
 
   final Widget child;
@@ -28,6 +29,9 @@ class HoverCard extends StatefulWidget {
 
   /// Soulèvement au survol, en pixels (0 pour les lignes de liste).
   final double lift;
+
+  /// Faux : pas de bordure au repos (lignes de liste), seulement au survol.
+  final bool outlined;
 
   @override
   State<HoverCard> createState() => _HoverCardState();
@@ -62,7 +66,11 @@ class _HoverCardState extends State<HoverCard> {
             decoration: BoxDecoration(
               color: widget.selected ? Color.alphaBlend(Nx.accent.withValues(alpha: 0.08), widget.color) : widget.color,
               borderRadius: BorderRadius.circular(widget.radius),
-              border: Border.all(color: highlight ? Nx.accent.withValues(alpha: 0.7) : Nx.border),
+              border: Border.all(
+                color: highlight
+                    ? Nx.accent.withValues(alpha: 0.7)
+                    : (widget.outlined ? Nx.border : Colors.transparent),
+              ),
               boxShadow: active
                   ? [
                       BoxShadow(

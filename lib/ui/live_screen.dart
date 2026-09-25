@@ -338,6 +338,7 @@ class _ChannelPane extends StatelessWidget {
                         radius: Nx.radiusSm,
                         scale: 1,
                         lift: 0,
+                        outlined: false,
                         color: Colors.transparent,
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         child: Row(children: [
@@ -388,6 +389,7 @@ class _PaneTile extends StatelessWidget {
           radius: Nx.radiusSm,
           scale: 1,
           lift: 0,
+          outlined: false,
           color: Colors.transparent,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           child: Row(children: [
