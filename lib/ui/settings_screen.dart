@@ -49,7 +49,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     icon: const Icon(Icons.arrow_back_rounded),
                   ),
                   const SizedBox(width: 6),
-                  Text('Paramètres', style: Theme.of(context).textTheme.titleLarge),
+                  Flexible(
+                    child: Text(
+                      'Paramètres',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
                 ]),
               ),
               for (final t in SettingsTab.values)
@@ -111,7 +118,14 @@ class _TabItemState extends State<_TabItem> {
           child: Row(children: [
             Icon(widget.tab.icon, size: 20, color: color),
             const SizedBox(width: 12),
-            Text(widget.tab.label, style: TextStyle(color: sel ? Nx.text : color, fontWeight: sel ? FontWeight.w700 : FontWeight.w500)),
+            Flexible(
+              child: Text(
+                widget.tab.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: sel ? Nx.text : color, fontWeight: sel ? FontWeight.w700 : FontWeight.w500),
+              ),
+            ),
           ]),
         ),
       ),
