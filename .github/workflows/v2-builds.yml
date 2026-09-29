@@ -32,7 +32,9 @@ jobs:
       - run: flutter analyze
       - run: flutter test
       - id: v
-        run: echo "version=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *([^+]+).*/\1/')" >> "$GITHUB_OUTPUT"
+        run: |
+          v="$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *([^+]+).*/\1/')"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
 
   # -------------------------------------------------- Android
   android:
