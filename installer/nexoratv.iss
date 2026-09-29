@@ -16,7 +16,9 @@
 [Setup]
 ; Identifiant FIXE : ne jamais le changer, sinon Windows verrait une autre
 ; application et les mises à jour ne remplaceraient plus l'installation.
-AppId={{BF1A93ED-C120-435C-A2F9-AE8066C8C498}
+; C'est celui de la 1.x (écrit tel quel, doubles accolades comprises) : la
+; 2.0 remplace l'ancienne appli au lieu de s'installer à côté.
+AppId={{9F3B7C42-7B1E-4E2A-9C55-A1B2C3D4E5F6}}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
