@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/models.dart';
 import '../state/app_state.dart';
+import '../state/library.dart';
 import 'catalog.dart';
+import 'library_widgets.dart';
 import 'player.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -15,6 +17,7 @@ class SeriesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final categories =
         ref.watch(seriesCategoriesProvider).value ?? const <Category>[];
+    final favorites = ref.watch(libraryProvider.select((l) => l.favorites));
     return ref
         .watch(seriesProvider)
         .when(
@@ -41,6 +44,8 @@ class SeriesScreen extends ConsumerWidget {
               title: 'Séries',
               searchHint: 'Rechercher une série',
               categories: categories,
+              favoriteIds: Library(favorites: favorites)
+                  .favoriteIds(MediaKind.series),
               items: [
                 for (final s in series)
                   PosterItem(
@@ -82,17 +87,34 @@ class _SeriesDetailPageState extends ConsumerState<SeriesDetailPage> {
     return content.seasons(widget.series);
   }
 
-  void _play(List<Episode> episodes, int index) => PlayerPage.open(context, [
-    for (final e in episodes)
-      PlayItem(
-        '${widget.series.name} — S${e.season} E${e.number} · ${e.title}',
-        e.url,
-      ),
-  ], index: index);
+  void _play(List<Episode> episodes, int index) =>
+      playEpisodes(context, widget.series, episodes, index);
+
+  /// Dernier épisode commencé de cette série : (épisodes de sa saison,
+  /// position dans la saison, avancement).
+  (List<Episode>, int, WatchProgress)? _resume(
+    List<Season> seasons,
+    Map<String, WatchProgress> progress,
+  ) {
+    WatchProgress? latest;
+    for (final p in progress.values) {
+      if (p.kind != MediaKind.episode || p.seriesId != widget.series.id) {
+        continue;
+      }
+      if (latest == null || p.updatedAt.isAfter(latest.updatedAt)) latest = p;
+    }
+    if (latest == null) return null;
+    for (final season in seasons) {
+      final i = season.episodes.indexWhere((e) => e.id == latest!.id);
+      if (i >= 0) return (season.episodes, i, latest);
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final s = widget.series;
+    final progress = ref.watch(libraryProvider.select((l) => l.progress));
     return Scaffold(
       body: FutureBuilder<List<Season>>(
         future: _seasons,
@@ -102,6 +124,7 @@ class _SeriesDetailPageState extends ConsumerState<SeriesDetailPage> {
               ? null
               : seasons[_seasonIndex.clamp(0, seasons.length - 1)];
           final firstEpisodes = seasons.isEmpty ? null : seasons.first.episodes;
+          final resume = _resume(seasons, progress);
 
           return CustomScrollView(
             slivers: [
@@ -118,12 +141,29 @@ class _SeriesDetailPageState extends ConsumerState<SeriesDetailPage> {
                   ],
                   plot: s.plot,
                   actions: [
-                    if (firstEpisodes != null && firstEpisodes.isNotEmpty)
+                    if (resume != null)
                       FilledButton.icon(
-                        onPressed: () => _play(firstEpisodes, 0),
+                        onPressed: () => _play(resume.$1, resume.$2),
                         icon: const Icon(Icons.play_arrow_rounded),
-                        label: const Text('Regarder le premier épisode'),
+                        label: Text(
+                          'Reprendre S${resume.$1[resume.$2].season} '
+                          'E${resume.$1[resume.$2].number} à '
+                          '${formatPosition(resume.$3.position)}',
+                        ),
                       ),
+                    if (firstEpisodes != null && firstEpisodes.isNotEmpty)
+                      resume == null
+                          ? FilledButton.icon(
+                              onPressed: () => _play(firstEpisodes, 0),
+                              icon: const Icon(Icons.play_arrow_rounded),
+                              label: const Text('Regarder le premier épisode'),
+                            )
+                          : OutlinedButton.icon(
+                              onPressed: () => _play(firstEpisodes, 0),
+                              icon: const Icon(Icons.replay_rounded),
+                              label: const Text('Premier épisode'),
+                            ),
+                    FavoriteButton(kind: MediaKind.series, id: s.id),
                   ],
                 ),
               ),
@@ -181,6 +221,8 @@ class _SeriesDetailPageState extends ConsumerState<SeriesDetailPage> {
                     itemBuilder: (_, i) => _EpisodeTile(
                       episode: season.episodes[i],
                       fallbackImage: s.cover,
+                      watched: progress['episode:${season.episodes[i].id}']
+                          ?.fraction,
                       onTap: () => _play(season.episodes, i),
                     ),
                   ),
@@ -199,11 +241,15 @@ class _EpisodeTile extends StatelessWidget {
     required this.episode,
     required this.onTap,
     this.fallbackImage,
+    this.watched,
   });
 
   final Episode episode;
   final VoidCallback onTap;
   final String? fallbackImage;
+
+  /// Avancement si l'épisode est commencé.
+  final double? watched;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -235,6 +281,13 @@ class _EpisodeTile extends StatelessWidget {
                       child: Icon(Icons.play_arrow_rounded, color: Nx.accent),
                     ),
                   ),
+                  if (watched != null)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: WatchBar(fraction: watched!),
+                    ),
                 ],
               ),
             ),
@@ -284,3 +337,22 @@ class _EpisodeTile extends StatelessWidget {
     ),
   );
 }
+
+/// Lance des épisodes à la suite, à partir de [index] (reprise automatique
+/// de l'épisode s'il était commencé).
+Future<void> playEpisodes(
+  BuildContext context,
+  Series series,
+  List<Episode> episodes,
+  int index,
+) => PlayerPage.open(context, [
+  for (final e in episodes)
+    PlayItem(
+      '${series.name} — S${e.season} E${e.number} · ${e.title}',
+      e.url,
+      kind: MediaKind.episode,
+      id: e.id,
+      image: e.image ?? series.cover,
+      seriesId: series.id,
+    ),
+], index: index);

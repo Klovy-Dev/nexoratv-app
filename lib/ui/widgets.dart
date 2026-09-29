@@ -1,5 +1,3 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -36,8 +34,8 @@ class HoverCard extends StatefulWidget {
   /// Faux : pas de bordure au repos (lignes de liste), seulement au survol.
   final bool outlined;
 
-  /// Verre dépoli : floute ce qu'il y a derrière (à poser sur un
-  /// [GlassBackdrop] pour que l'effet se voie).
+  /// Verre dépoli : carte translucide (à poser sur un [GlassBackdrop] pour
+  /// que l'effet se voie). Pas de vrai flou, trop coûteux sur fond animé.
   final bool glass;
 
   @override
@@ -46,18 +44,33 @@ class HoverCard extends StatefulWidget {
 
 class _HoverCardState extends State<HoverCard> {
   bool _hover = false;
+  bool _focus = false;
   bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final active = _hover && widget.onTap != null;
+    final active = (_hover || _focus) && widget.onTap != null;
     final highlight = active || widget.selected;
-    return MouseRegion(
-      cursor: widget.onTap != null
+    // Focusable au clavier (Tab, flèches) et activable avec Entrée /
+    // Espace : indispensable pour la télécommande d'Android TV.
+    return FocusableActionDetector(
+      enabled: widget.onTap != null,
+      mouseCursor: widget.onTap != null
           ? SystemMouseCursors.click
           : MouseCursor.defer,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = _pressed = false),
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap?.call();
+            return null;
+          },
+        ),
+      },
+      onShowHoverHighlight: (v) => setState(() {
+        _hover = v;
+        if (!v) _pressed = false;
+      }),
+      onShowFocusHighlight: (v) => setState(() => _focus = v),
       child: GestureDetector(
         onTapDown: (_) => setState(() => _pressed = true),
         onTapCancel: () => setState(() => _pressed = false),
@@ -87,20 +100,23 @@ class _HoverCardState extends State<HoverCard> {
                         : widget.color,
                     borderRadius: BorderRadius.circular(widget.radius),
                     border: Border.all(
-                      color: highlight
+                      color: _focus
+                          ? Nx.accent
+                          : highlight
                           ? Nx.accent.withValues(alpha: 0.7)
                           : (widget.outlined ? Nx.border : Colors.transparent),
+                      width: _focus ? 2 : 1,
                     ),
-                    boxShadow: active
-                        ? [
-                            BoxShadow(
-                              color: Nx.accent.withValues(alpha: 0.18),
-                              blurRadius: 28,
-                              spreadRadius: -6,
-                              offset: const Offset(0, 14),
-                            ),
-                          ]
-                        : const [],
+                    boxShadow: [
+                      if (_focus) _focusRing,
+                      if (active && widget.lift > 0)
+                        BoxShadow(
+                          color: Nx.accent.withValues(alpha: 0.18),
+                          blurRadius: 28,
+                          spreadRadius: -6,
+                          offset: const Offset(0, 14),
+                        ),
+                    ],
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: widget.child,
@@ -125,6 +141,7 @@ class _HoverCardState extends State<HoverCard> {
             spreadRadius: -12,
             offset: const Offset(0, 20),
           ),
+          if (_focus) _focusRing,
           if (active)
             BoxShadow(
               color: Nx.accent.withValues(alpha: 0.22),
@@ -134,38 +151,148 @@ class _HoverCardState extends State<HoverCard> {
             ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: AnimatedContainer(
-            duration: Nx.fast,
-            curve: Nx.ease,
-            padding: widget.padding,
-            decoration: BoxDecoration(
-              borderRadius: radius,
-              // Teinte translucide + reflet en haut à gauche.
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: active ? 0.13 : 0.09),
-                  Colors.white.withValues(alpha: active ? 0.05 : 0.025),
-                ],
-              ),
-              border: Border.all(
-                color: highlight
-                    ? Nx.accent.withValues(alpha: 0.65)
-                    : Colors.white.withValues(alpha: 0.13),
-              ),
-            ),
-            child: widget.child,
+      // Pas de BackdropFilter : le fond (GlassBackdrop) n'est fait que de
+      // dégradés très doux, le flouter ne change rien à l'image mais
+      // coûterait un flou complet à chaque image tant que le fond bouge.
+      // La teinte translucide suffit à l'effet verre.
+      child: AnimatedContainer(
+        duration: Nx.fast,
+        curve: Nx.ease,
+        padding: widget.padding,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          // Teinte translucide + reflet en haut à gauche.
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withValues(alpha: active ? 0.13 : 0.09),
+              Colors.white.withValues(alpha: active ? 0.05 : 0.025),
+            ],
+          ),
+          border: Border.all(
+            color: _focus
+                ? Nx.accent
+                : highlight
+                ? Nx.accent.withValues(alpha: 0.65)
+                : Colors.white.withValues(alpha: 0.13),
+            width: _focus ? 2 : 1,
           ),
         ),
+        child: widget.child,
       ),
     );
   }
 }
+
+/// Ligne de liste (catégories, chaînes) : fond discret au survol, barre
+/// corail à gauche quand elle est sélectionnée, contour au focus clavier.
+class ListRow extends StatefulWidget {
+  const ListRow({
+    super.key,
+    required this.child,
+    required this.onTap,
+    this.selected = false,
+    this.padding = const EdgeInsets.symmetric(horizontal: 12),
+  });
+
+  final Widget child;
+  final VoidCallback onTap;
+  final bool selected;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  State<ListRow> createState() => _ListRowState();
+}
+
+class _ListRowState extends State<ListRow> {
+  bool _hover = false;
+  bool _focus = false;
+
+  @override
+  Widget build(BuildContext context) => FocusableActionDetector(
+    mouseCursor: SystemMouseCursors.click,
+    actions: {
+      ActivateIntent: CallbackAction<ActivateIntent>(
+        onInvoke: (_) {
+          widget.onTap();
+          return null;
+        },
+      ),
+    },
+    onShowHoverHighlight: (v) => setState(() => _hover = v),
+    onShowFocusHighlight: (v) => setState(() => _focus = v),
+    child: GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        decoration: BoxDecoration(
+          color: widget.selected
+              ? Nx.surface2
+              : (_hover || _focus ? Nx.surface : Colors.transparent),
+          borderRadius: BorderRadius.circular(Nx.radiusSm),
+          border: Border.all(
+            color: _focus ? Nx.accent : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: Nx.fast,
+              curve: Nx.ease,
+              width: 3,
+              height: widget.selected ? 20 : 0,
+              decoration: BoxDecoration(
+                color: Nx.accent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Expanded(
+              child: Padding(padding: widget.padding, child: widget.child),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// Fondu en haut et en bas d'une liste qui défile : le texte qui passe
+/// sous un titre s'efface au lieu d'être coupé net.
+class EdgeFade extends StatelessWidget {
+  const EdgeFade({super.key, required this.child, this.size = 14});
+
+  final Widget child;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, c) {
+      final stop = c.maxHeight <= 0 ? 0.0 : (size / c.maxHeight).clamp(0, 0.5);
+      return ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (rect) => LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: const [
+            Colors.transparent,
+            Colors.black,
+            Colors.black,
+            Colors.transparent,
+          ],
+          stops: [0, stop.toDouble(), 1 - stop.toDouble(), 1],
+        ).createShader(rect),
+        child: child,
+      );
+    },
+  );
+}
+
+/// Halo autour de l'élément qui a le focus clavier (lisible de loin, sur
+/// une télé comme sur un PC).
+const _focusRing = BoxShadow(color: Color(0x59FF4B3E), spreadRadius: 4);
 
 /// Fond animé pour l'effet verre : halos corail et ambrés, très flous, qui
 /// dérivent lentement derrière les cartes.
@@ -193,59 +320,74 @@ class _GlassBackdropState extends State<GlassBackdrop>
   @override
   Widget build(BuildContext context) => Stack(
     children: [
-      const Positioned.fill(child: ColoredBox(color: Nx.bg)),
+      // Le fond se repeint seul (aucune reconstruction de widgets) et le
+      // contenu, dans sa propre couche, n'est jamais repeint à cause de lui.
       Positioned.fill(
         child: RepaintBoundary(
-          child: AnimatedBuilder(
-            animation: _drift,
-            builder: (context, _) {
-              final t = Curves.easeInOut.transform(_drift.value);
-              return Stack(
-                children: [
-                  _blob(
-                    Alignment(-0.75 + 0.25 * t, -0.55 + 0.2 * t),
-                    620,
-                    Nx.accent,
-                    0.42,
-                  ),
-                  _blob(
-                    Alignment(0.85 - 0.2 * t, 0.2 - 0.3 * t),
-                    560,
-                    const Color(0xFFFF9A3C),
-                    0.26,
-                  ),
-                  _blob(
-                    Alignment(0.05 + 0.15 * t, 1.1 - 0.15 * t),
-                    700,
-                    const Color(0xFF8E1B3A),
-                    0.38,
-                  ),
-                ],
-              );
-            },
-          ),
+          child: CustomPaint(painter: _BlobPainter(_drift)),
         ),
       ),
-      widget.child,
+      RepaintBoundary(child: widget.child),
     ],
   );
+}
 
-  Widget _blob(Alignment at, double size, Color color, double alpha) => Align(
-    alignment: at,
-    child: Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [
-            color.withValues(alpha: alpha),
-            color.withValues(alpha: 0),
-          ],
-        ),
-      ),
-    ),
-  );
+class _BlobPainter extends CustomPainter {
+  _BlobPainter(this.drift) : super(repaint: drift);
+
+  final Animation<double> drift;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = Nx.bg);
+    final t = Curves.easeInOut.transform(drift.value);
+    _blob(
+      canvas,
+      size,
+      Alignment(-0.75 + 0.25 * t, -0.55 + 0.2 * t),
+      310,
+      Nx.accent,
+      0.42,
+    );
+    _blob(
+      canvas,
+      size,
+      Alignment(0.85 - 0.2 * t, 0.2 - 0.3 * t),
+      280,
+      const Color(0xFFFF9A3C),
+      0.26,
+    );
+    _blob(
+      canvas,
+      size,
+      Alignment(0.05 + 0.15 * t, 1.1 - 0.15 * t),
+      350,
+      const Color(0xFF8E1B3A),
+      0.38,
+    );
+  }
+
+  void _blob(
+    Canvas canvas,
+    Size size,
+    Alignment at,
+    double radius,
+    Color color,
+    double alpha,
+  ) {
+    final center = at.alongSize(size);
+    final paint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          color.withValues(alpha: alpha),
+          color.withValues(alpha: 0),
+        ],
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+    canvas.drawCircle(center, radius, paint);
+  }
+
+  @override
+  bool shouldRepaint(_BlobPainter old) => old.drift != drift;
 }
 
 /// Image réseau avec repli sur les initiales (logos de chaînes, affiches).

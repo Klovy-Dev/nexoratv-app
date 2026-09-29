@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/catalog_cache.dart';
 import '../core/config.dart';
+import '../core/updater.dart';
 import '../state/app_state.dart';
 import '../state/settings.dart';
 import 'sources_screen.dart';
 import 'theme.dart';
-
-const kAppVersion = '2.0.0';
+import 'toast.dart';
+import 'update_dialog.dart';
 
 enum SettingsTab {
   sources('Compte et sources', Icons.manage_accounts_rounded),
@@ -317,9 +319,6 @@ class _StoragePanel extends ConsumerStatefulWidget {
 }
 
 class _StoragePanelState extends ConsumerState<_StoragePanel> {
-  void _toast(String msg) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-
   @override
   Widget build(BuildContext context) => _Panel(
     title: 'Données',
@@ -329,26 +328,34 @@ class _StoragePanelState extends ConsumerState<_StoragePanel> {
           _Row(
             title: 'Recharger les listes',
             subtitle: 'Télécharge à nouveau les chaînes, films et séries de la source active.',
-            trailing: OutlinedButton(
-              onPressed: () {
+            trailing: ActionButton(
+              label: 'Recharger',
+              icon: Icons.refresh_rounded,
+              onPressed: () async {
+                final overlay = Overlay.of(context, rootOverlay: true);
+                // Le cache disque servirait sinon l'ancien catalogue.
+                final active = ref.read(appProvider).active;
+                if (active != null) await CatalogCache.clear(active.id);
                 ref.invalidate(contentProvider);
-                _toast(
+                showToastIn(
+                  overlay,
                   'Les listes seront rechargées à la prochaine ouverture.',
                 );
               },
-              child: const Text('Recharger'),
             ),
           ),
           _Row(
             title: 'Vider le cache des images',
             subtitle: 'Supprime les logos et affiches enregistrés sur ce PC (ils se re-téléchargent au besoin).',
-            trailing: OutlinedButton(
+            trailing: ActionButton(
+              label: 'Vider',
+              icon: Icons.delete_outline_rounded,
               onPressed: () async {
+                final overlay = Overlay.of(context, rootOverlay: true);
                 await DefaultCacheManager().emptyCache();
                 PaintingBinding.instance.imageCache.clear();
-                _toast('Cache des images vidé.');
+                showToastIn(overlay, 'Cache des images vidé.');
               },
-              child: const Text('Vider'),
             ),
           ),
         ],
@@ -361,7 +368,7 @@ class _AboutPanel extends StatelessWidget {
   const _AboutPanel();
 
   @override
-  Widget build(BuildContext context) => const _Panel(
+  Widget build(BuildContext context) => _Panel(
     title: 'À propos',
     children: [
       _Group(
@@ -369,12 +376,25 @@ class _AboutPanel extends StatelessWidget {
           _Row(
             title: 'Version',
             subtitle: 'NexoraTV pour Windows',
-            trailing: Text(
-              kAppVersion,
-              style: TextStyle(fontWeight: FontWeight.w700),
+            trailing: FutureBuilder<String>(
+              future: Updater.currentVersion(),
+              builder: (_, snap) => Text(
+                snap.data ?? '—',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
           ),
           _Row(
+            title: 'Mises à jour',
+            subtitle:
+                'Vérifiées à chaque démarrage, téléchargées depuis GitHub.',
+            trailing: ActionButton(
+              label: 'Rechercher',
+              icon: Icons.system_update_alt_rounded,
+              onPressed: () => checkForUpdate(context),
+            ),
+          ),
+          const _Row(
             title: 'Site',
             subtitle: 'Compte, abonnements et assistance',
             trailing: SelectableText(kApiBase),

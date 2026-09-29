@@ -49,6 +49,8 @@ class M3uContent implements ContentSource {
   @override
   Future<List<LiveChannel>> liveChannels() async => (await _load()).channels;
   @override
+  Future<List<EpgEntry>> shortEpg(LiveChannel channel) async => const [];
+  @override
   Future<List<Category>> movieCategories() async =>
       (await _load()).movieCategories;
   @override

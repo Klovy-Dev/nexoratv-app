@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.gaby" "\0"
-            VALUE "FileDescription", "nexoratv" "\0"
+            VALUE "FileDescription", "NexoraTV" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "nexoratv" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.gaby. All rights reserved." "\0"
             VALUE "OriginalFilename", "nexoratv.exe" "\0"
-            VALUE "ProductName", "nexoratv" "\0"
+            VALUE "ProductName", "NexoraTV" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

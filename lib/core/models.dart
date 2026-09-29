@@ -106,6 +106,7 @@ class Movie {
     this.poster,
     this.rating,
     this.year,
+    this.added,
   });
 
   final String id;
@@ -115,6 +116,9 @@ class Movie {
   final String? poster;
   final double? rating;
   final String? year;
+
+  /// Date d'ajout sur le serveur (secondes Unix), pour « Ajoutés récemment ».
+  final int? added;
 }
 
 class MovieDetails {
@@ -147,6 +151,7 @@ class Series {
     this.rating,
     this.year,
     this.episodes,
+    this.updated,
   });
 
   final String id;
@@ -159,6 +164,9 @@ class Series {
 
   /// Sources M3U : épisodes déjà connus (Xtream : chargés à la demande).
   final List<Episode>? episodes;
+
+  /// Dernière mise à jour sur le serveur (secondes Unix).
+  final int? updated;
 }
 
 class Season {
@@ -241,4 +249,26 @@ class AccountSubscription {
     expiresAt: expiresAt,
     active: active,
   );
+}
+
+/// Programme TV (guide des programmes, « en ce moment » / « ensuite »).
+class EpgEntry {
+  const EpgEntry({
+    required this.title,
+    required this.start,
+    required this.end,
+    this.description,
+  });
+
+  final String title;
+  final DateTime start;
+  final DateTime end;
+  final String? description;
+
+  /// Avancement entre 0 et 1 à l'instant [now].
+  double progressAt(DateTime now) {
+    final total = end.difference(start).inSeconds;
+    if (total <= 0) return 0;
+    return (now.difference(start).inSeconds / total).clamp(0, 1).toDouble();
+  }
 }

@@ -1,8 +1,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Absente du modèle en release : sans elle, rien ne se charge. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Android TV / Fire TV : pas d'écran tactile, lanceur « leanback ». -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+    <uses-feature android:name="android.software.leanback" android:required="false"/>
+
+    <!-- usesCleartextTraffic : la plupart des serveurs Xtream sont en http. -->
     <application
-        android:label="nexoratv"
+        android:label="NexoraTV"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:banner="@drawable/tv_banner"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -23,6 +33,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

@@ -5,13 +5,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'state/app_state.dart';
 import 'state/settings.dart';
-import 'ui/home_screen.dart';
 import 'ui/onboarding.dart';
+import 'ui/shell.dart';
+import 'ui/splash.dart';
 import 'ui/theme.dart';
+import 'ui/title_bar.dart';
+import 'ui/update_dialog.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
+  await setupWindow();
   final prefs = await SharedPreferences.getInstance();
   runApp(
     ProviderScope(
@@ -32,20 +36,44 @@ class NexoraApp extends StatelessWidget {
     title: 'NexoraTV',
     debugShowCheckedModeBanner: false,
     theme: buildTheme(),
+    builder: withTitleBar,
     home: const _Root(),
   );
 }
 
-class _Root extends ConsumerWidget {
+class _Root extends ConsumerStatefulWidget {
   const _Root();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_Root> createState() => _RootState();
+}
+
+class _RootState extends ConsumerState<_Root> {
+  /// Vrai une fois l'écran de chargement terminé (compte + catalogue).
+  bool _loaded = false;
+
+  @override
+  Widget build(BuildContext context) {
     final app = ref.watch(appProvider);
-    if (!app.ready) {
-      return const Scaffold(body: Center(child: Brand(size: 34)));
+    final Widget screen;
+    if (!_loaded) {
+      screen = SplashScreen(
+        onDone: () {
+          setState(() => _loaded = true);
+          // Nouvelle version sur GitHub ? Proposée une fois l'accueil affiché.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) checkForUpdate(context, silent: true);
+          });
+        },
+      );
+    } else if (!app.loggedIn && app.sources.isEmpty) {
+      screen = const WelcomeScreen();
+    } else {
+      screen = const AppShell();
     }
-    if (!app.loggedIn && app.sources.isEmpty) return const WelcomeScreen();
-    return const HomeScreen();
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 450),
+      child: screen,
+    );
   }
 }

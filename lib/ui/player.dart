@@ -5,8 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../state/library.dart';
 import '../state/settings.dart';
 import 'theme.dart';
+import 'title_bar.dart';
+import 'widgets.dart';
 
 /// Lecteur partagé, réglé selon les paramètres (tampon, décodage matériel).
 (Player, VideoController) createPlayer(Settings settings) {
@@ -66,9 +69,23 @@ MaterialDesktopVideoControlsThemeData playerControlsTheme({
 );
 
 class PlayItem {
-  const PlayItem(this.title, this.url);
+  const PlayItem(
+    this.title,
+    this.url, {
+    this.kind,
+    this.id,
+    this.image,
+    this.seriesId,
+  });
+
   final String title;
   final String url;
+
+  /// Film ou épisode : sert à la reprise de lecture (null = pas de suivi).
+  final MediaKind? kind;
+  final String? id;
+  final String? image;
+  final String? seriesId;
 }
 
 /// Lecture d'un film ou d'une suite d'épisodes (passage automatique au
@@ -102,41 +119,100 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   late int _index = widget.index;
   final _subs = <StreamSubscription<Object?>>[];
 
+  /// Lu une fois : `ref` n'est plus utilisable dans dispose().
+  late final LibraryController _library = ref.read(libraryProvider.notifier);
+  Timer? _saveTimer;
+
+  /// Position où reprendre dès que la durée du média est connue.
+  Duration? _pendingSeek;
+  Duration _position = Duration.zero;
+  bool _failed = false;
+
   @override
   void initState() {
     super.initState();
+    _pendingSeek = _resumeAt(_index);
     _subs
       ..add(
         _player.stream.playlist.listen((p) {
-          if (mounted && p.index != _index) setState(() => _index = p.index);
+          if (!mounted || p.index == _index) return;
+          _saveProgress(); // l'épisode qu'on quitte
+          setState(() => _index = p.index);
+          _position = Duration.zero;
+          _pendingSeek = _resumeAt(p.index);
         }),
       )
       ..add(
+        _player.stream.duration.listen((d) {
+          final seek = _pendingSeek;
+          if (d > Duration.zero && seek != null && seek < d) {
+            _pendingSeek = null;
+            _player.seek(seek);
+          }
+        }),
+      )
+      ..add(_player.stream.position.listen((p) => _position = p))
+      ..add(
+        // Un seul écran d'erreur (media_kit peut en signaler plusieurs
+        // d'affilée pour une même coupure).
         _player.stream.error.listen((_) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Lecture impossible pour le moment. Réessayez dans un instant.',
-              ),
-            ),
-          );
+          if (mounted && !_failed) setState(() => _failed = true);
         }),
       );
-    _player.open(
-      Playlist([
-        for (final i in widget.items) Media(i.url),
-      ], index: widget.index),
+    _open();
+    _saveTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _saveProgress(),
     );
   }
 
   @override
   void dispose() {
+    _saveTimer?.cancel();
+    _saveProgress();
     for (final s in _subs) {
       s.cancel();
     }
     _player.dispose();
     super.dispose();
+  }
+
+  void _open() => _player.open(
+    Playlist([for (final i in widget.items) Media(i.url)], index: _index),
+  );
+
+  Duration? _resumeAt(int index) {
+    final item = widget.items[index];
+    if (item.kind == null || item.id == null) return null;
+    return ref
+        .read(libraryProvider)
+        .progressFor(item.kind!, item.id!)
+        ?.position;
+  }
+
+  void _saveProgress() {
+    final item = widget.items[_index.clamp(0, widget.items.length - 1)];
+    final duration = _player.state.duration;
+    if (item.kind == null || item.id == null || _failed) return;
+    _library.saveProgress(
+      WatchProgress(
+        kind: item.kind!,
+        id: item.id!,
+        title: item.title,
+        image: item.image,
+        seriesId: item.seriesId,
+        position: _position,
+        duration: duration,
+        updatedAt: DateTime.now(),
+      ),
+    );
+  }
+
+  /// Relance le média en cours là où il s'est interrompu.
+  void _retry() {
+    setState(() => _failed = false);
+    _pendingSeek = _position > const Duration(seconds: 5) ? _position : null;
+    _open();
   }
 
   @override
@@ -182,7 +258,40 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
           bottomButtonBar: bottom,
           topButtonBar: [titleText],
         ),
-        child: Video(controller: _controller),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Video(
+              controller: _controller,
+              onEnterFullscreen: enterVideoFullscreen,
+              onExitFullscreen: exitVideoFullscreen,
+            ),
+            if (_failed)
+              ColoredBox(
+                color: Colors.black.withValues(alpha: 0.8),
+                child: MessageView(
+                  icon: Icons
+                      .signal_wifi_statusbar_connected_no_internet_4_rounded,
+                  title: 'Lecture interrompue',
+                  message: 'Le serveur ne répond pas pour le moment. La lecture reprendra là où elle s’est arrêtée.',
+                  action: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      OutlinedButton(
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        child: const Text('Retour'),
+                      ),
+                      const SizedBox(width: 12),
+                      FilledButton(
+                        onPressed: _retry,
+                        child: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

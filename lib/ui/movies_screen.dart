@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/models.dart';
 import '../state/app_state.dart';
+import '../state/library.dart';
 import 'catalog.dart';
+import 'library_widgets.dart';
 import 'player.dart';
 import 'widgets.dart';
 
@@ -14,6 +16,9 @@ class MoviesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final categories =
         ref.watch(movieCategoriesProvider).value ?? const <Category>[];
+    // `favorites` ne change qu'à l'ajout / retrait d'un favori (pas à chaque
+    // enregistrement de la reprise de lecture).
+    final favorites = ref.watch(libraryProvider.select((l) => l.favorites));
     return ref
         .watch(moviesProvider)
         .when(
@@ -40,6 +45,8 @@ class MoviesScreen extends ConsumerWidget {
               title: 'Films',
               searchHint: 'Rechercher un film',
               categories: categories,
+              favoriteIds: Library(favorites: favorites)
+                  .favoriteIds(MediaKind.movie),
               items: [
                 for (final m in movies)
                   PosterItem(
@@ -70,6 +77,9 @@ class MovieDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final content = ref.watch(contentProvider);
+    final progress = ref.watch(
+      libraryProvider.select((l) => l.progressFor(MediaKind.movie, movie.id)),
+    );
     return Scaffold(
       body: FutureBuilder<MovieDetails?>(
         future: content?.movieDetails(movie),
@@ -104,12 +114,26 @@ class MovieDetailPage extends ConsumerWidget {
                       ),
               actions: [
                 FilledButton.icon(
-                  onPressed: () => PlayerPage.open(context, [
-                    PlayItem(movie.name, movie.url),
-                  ]),
+                  onPressed: () => playMovie(context, movie),
                   icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Lecture'),
+                  label: Text(
+                    progress == null
+                        ? 'Lecture'
+                        : 'Reprendre à ${formatPosition(progress.position)}',
+                  ),
                 ),
+                if (progress != null)
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      ref
+                          .read(libraryProvider.notifier)
+                          .removeProgress(MediaKind.movie, movie.id);
+                      playMovie(context, movie);
+                    },
+                    icon: const Icon(Icons.replay_rounded),
+                    label: const Text('Depuis le début'),
+                  ),
+                FavoriteButton(kind: MediaKind.movie, id: movie.id),
               ],
             ),
           );
@@ -118,6 +142,18 @@ class MovieDetailPage extends ConsumerWidget {
     );
   }
 }
+
+/// Lance un film (reprend là où on s'était arrêté, s'il y a lieu).
+Future<void> playMovie(BuildContext context, Movie movie) =>
+    PlayerPage.open(context, [
+      PlayItem(
+        movie.name,
+        movie.url,
+        kind: MediaKind.movie,
+        id: movie.id,
+        image: movie.poster,
+      ),
+    ]);
 
 extension on String {
   String? ifEmpty(String? fallback) => isEmpty ? fallback : this;

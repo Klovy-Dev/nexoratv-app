@@ -26,11 +26,17 @@ http://srv:8080/series/u/p/19.mp4
 
     final series = c.series.single;
     expect(series.name, 'Ma Série');
-    expect(series.episodes!.map((e) => (e.season, e.number)), containsAll([(1, 1), (1, 2)]));
+    expect(
+      series.episodes!.map((e) => (e.season, e.number)),
+      containsAll([(1, 1), (1, 2)]),
+    );
   });
 
   test('normalise l’adresse d’un serveur Xtream', () {
     expect(XtreamContent.normalizeBase('srv.com:8080/'), 'http://srv.com:8080');
-    expect(XtreamContent.normalizeBase('https://srv.com/player_api.php?username=a'), 'https://srv.com');
+    expect(
+      XtreamContent.normalizeBase('https://srv.com/player_api.php?username=a'),
+      'https://srv.com',
+    );
   });
 }

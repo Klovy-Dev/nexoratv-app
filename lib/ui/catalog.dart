@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
@@ -32,6 +34,7 @@ class PosterCatalog extends StatefulWidget {
     required this.items,
     required this.onOpen,
     required this.searchHint,
+    this.favoriteIds = const {},
   });
 
   final String title;
@@ -40,28 +43,78 @@ class PosterCatalog extends StatefulWidget {
   final ValueChanged<PosterItem> onOpen;
   final String searchHint;
 
+  /// Ids favoris : ajoute la pastille « Favoris » s'il y en a.
+  final Set<String> favoriteIds;
+
   @override
   State<PosterCatalog> createState() => _PosterCatalogState();
 }
 
 class _PosterCatalogState extends State<PosterCatalog> {
+  /// Pseudo-catégorie « Favoris » (aucun id de serveur ne ressemble à ça).
+  static const _favorites = '__favorites__';
+
   String? _category;
   String _query = '';
+  Timer? _searchDebounce;
+
+  // Titres en minuscules et catégories utilisées : calculés une fois par
+  // liste reçue, pas à chaque frappe ou changement de catégorie.
+  List<PosterItem>? _indexed;
+  List<String> _lowerTitles = const [];
+  Set<String> _used = const {};
+
+  /// Filtre (catégorie, recherche, favoris) de [_visible] ; null = à
+  /// recalculer.
+  (String?, String, Set<String>?)? _filterKey;
+  List<PosterItem> _visible = const [];
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
+
+  void _index(List<PosterItem> items) {
+    if (identical(items, _indexed)) return;
+    _indexed = items;
+    _lowerTitles = [for (final i in items) i.title.toLowerCase()];
+    _used = {for (final i in items) i.categoryId};
+    _filterKey = null;
+  }
+
+  List<PosterItem> _filter(List<PosterItem> items) {
+    final q = _query.trim().toLowerCase();
+    final favorites = _category == _favorites ? widget.favoriteIds : null;
+    final key = (_category, q, favorites);
+    if (key == _filterKey) return _visible;
+    _filterKey = key;
+    return _visible = [
+      for (var i = 0; i < items.length; i++)
+        if ((favorites != null
+                ? favorites.contains(items[i].id)
+                : _category == null || items[i].categoryId == _category) &&
+            (q.isEmpty || _lowerTitles[i].contains(q)))
+          items[i],
+    ];
+  }
+
+  /// La recherche part quand on arrête de taper, pas à chaque touche.
+  void _onSearch(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 150), () {
+      if (mounted) setState(() => _query = value);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final used = {for (final i in widget.items) i.categoryId};
+    _index(widget.items);
     final categories = [
       for (final c in widget.categories)
-        if (used.contains(c.id)) c,
+        if (_used.contains(c.id)) c,
     ];
-    final q = _query.trim().toLowerCase();
-    final visible = [
-      for (final i in widget.items)
-        if ((_category == null || i.categoryId == _category) &&
-            (q.isEmpty || i.title.toLowerCase().contains(q)))
-          i,
-    ];
+    final visible = _filter(widget.items);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,7 +137,7 @@ class _PosterCatalogState extends State<PosterCatalog> {
                 width: 320,
                 child: SearchField(
                   hint: widget.searchHint,
-                  onChanged: (v) => setState(() => _query = v),
+                  onChanged: _onSearch,
                 ),
               ),
             ],
@@ -101,6 +154,12 @@ class _PosterCatalogState extends State<PosterCatalog> {
                 selected: _category == null,
                 onTap: () => setState(() => _category = null),
               ),
+              if (widget.favoriteIds.isNotEmpty || _category == _favorites)
+                CategoryChip(
+                  label: '★ Favoris',
+                  selected: _category == _favorites,
+                  onTap: () => setState(() => _category = _favorites),
+                ),
               for (final c in categories)
                 CategoryChip(
                   label: c.name,

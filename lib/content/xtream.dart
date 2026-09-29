@@ -1,6 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
 
+import 'package:crypto/crypto.dart';
+
+import '../core/catalog_cache.dart';
 import '../core/http.dart';
 import '../core/models.dart';
 import 'content_source.dart';
@@ -58,8 +62,57 @@ class XtreamContent implements ContentSource {
     return res.bodyBytes;
   }
 
-  Future<List<T>> _list<T>(String action, _Mapper<T> map) async =>
-      _decodeList(await _fetch({'action': action}), map, _parts);
+  /// Liste du catalogue : depuis le cache disque s'il existe (mis à jour en
+  /// fond pour le prochain démarrage), sinon depuis le serveur.
+  Future<List<T>> _list<T>(String action, _Mapper<T> map) async {
+    final key = _cacheKey(action);
+    final cached = await CatalogCache.read(source.id, key);
+    if (cached != null) {
+      unawaited(_refreshCache(action, key));
+      return _decodeList(cached, map, _parts);
+    }
+    final bytes = await _fetch({'action': action});
+    if (_looksLikeList(bytes)) {
+      unawaited(CatalogCache.write(source.id, key, bytes));
+    }
+    return _decodeList(bytes, map, _parts);
+  }
+
+  /// La clé inclut serveur et utilisateur : si les identifiants d'une source
+  /// changent, l'ancien catalogue n'est jamais resservi.
+  String _cacheKey(String action) {
+    final who = sha1.convert(utf8.encode('$_base|$_user')).toString();
+    return '${action}_${who.substring(0, 12)}';
+  }
+
+  Future<void> _refreshCache(String action, String key) async {
+    try {
+      final bytes = await _fetch({'action': action});
+      if (_looksLikeList(bytes)) {
+        await CatalogCache.write(source.id, key, bytes);
+      }
+    } catch (_) {
+      // Hors ligne ou serveur en panne : on garde le cache actuel.
+    }
+  }
+
+  /// Tableau JSON non vide (pas une page d'erreur ni une liste vide).
+  static bool _looksLikeList(List<int> bytes) {
+    for (final b in bytes) {
+      if (b == 0x20 || b == 0x0A || b == 0x0D || b == 0x09) continue;
+      return b == 0x5B && bytes.length > 2; // '['
+    }
+    return false;
+  }
+
+  @override
+  Future<List<EpgEntry>> shortEpg(LiveChannel channel) async => _decodeEpg(
+    await _fetch({
+      'action': 'get_short_epg',
+      'stream_id': channel.id,
+      'limit': '4',
+    }),
+  );
 
   @override
   Future<List<Category>> liveCategories() =>
@@ -137,6 +190,53 @@ Future<List<T>> _decodeList<T>(
       if (e is Map<String, Object?>) ?map(e, parts),
   ];
 });
+
+/// `get_short_epg` : titres et descriptions en base64, horaires en
+/// timestamps Unix (UTC). Seuls les programmes pas encore terminés sont gardés.
+List<EpgEntry> _decodeEpg(List<int> bytes) {
+  final data = _json(bytes);
+  final list = data is Map ? data['epg_listings'] : null;
+  if (list is! List) return const [];
+  String? text(Object? v) {
+    final s = jsonStr(v);
+    if (s == null) return null;
+    try {
+      return utf8.decode(base64.decode(s), allowMalformed: true).trim();
+    } catch (_) {
+      return s; // Certains panels envoient le texte en clair.
+    }
+  }
+
+  DateTime? time(Object? v) {
+    final n = int.tryParse(jsonStr(v) ?? '');
+    return n == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(n * 1000, isUtc: true).toLocal();
+  }
+
+  final now = DateTime.now();
+  final out = <EpgEntry>[];
+  for (final e in list) {
+    if (e is! Map) continue;
+    final title = text(e['title']);
+    final start = time(e['start_timestamp']);
+    final end = time(e['stop_timestamp'] ?? e['end_timestamp']);
+    if (title == null || title.isEmpty || start == null || end == null) {
+      continue;
+    }
+    if (!end.isAfter(now)) continue;
+    out.add(
+      EpgEntry(
+        title: title,
+        start: start,
+        end: end,
+        description: text(e['description']),
+      ),
+    );
+  }
+  out.sort((a, b) => a.start.compareTo(b.start));
+  return out;
+}
 
 Future<MovieDetails?> _decodeDetails(List<int> bytes) => Isolate.run(() {
   final data = _json(bytes);
@@ -221,6 +321,7 @@ Movie? _movie(Map<String, Object?> e, _UrlParts p) {
     poster: jsonStr(e['stream_icon']),
     rating: jsonNum(e['rating']),
     year: jsonStr(e['year']),
+    added: int.tryParse(jsonStr(e['added']) ?? ''),
   );
 }
 
@@ -235,5 +336,6 @@ Series? _oneSeries(Map<String, Object?> e, _UrlParts _) {
     plot: jsonStr(e['plot']),
     rating: jsonNum(e['rating']),
     year: jsonStr(e['releaseDate'] ?? e['release_date'])?.split('-').first,
+    updated: int.tryParse(jsonStr(e['last_modified']) ?? ''),
   );
 }

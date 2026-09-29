@@ -14,6 +14,9 @@ abstract class ContentSource {
   Future<List<Category>> liveCategories();
   Future<List<LiveChannel>> liveChannels();
 
+  /// Programme en cours et suivants (vide si la source n'a pas de guide).
+  Future<List<EpgEntry>> shortEpg(LiveChannel channel);
+
   Future<List<Category>> movieCategories();
   Future<List<Movie>> movies();
   Future<MovieDetails?> movieDetails(Movie movie);

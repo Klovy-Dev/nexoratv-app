@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../content/content_source.dart';
 import '../core/account_api.dart';
+import '../core/catalog_cache.dart';
 import '../core/http.dart';
 import '../core/models.dart';
 import '../core/storage.dart';
@@ -59,21 +62,33 @@ class AppController extends Notifier<AppState> {
     return const AppState();
   }
 
+  /// Terminé quand le stockage local est relu et le compte synchronisé :
+  /// l'écran de chargement l'attend avant de précharger le catalogue.
+  Future<void> get restored => _restored.future;
+  final _restored = Completer<void>();
+
   Future<void> _restore() async {
-    final token = await Storage.token();
-    state = state.copyWith(
-      ready: true,
-      token: () => token,
-      user: () => null,
-      sources: await Storage.sources(),
-      activeId: () => null,
-    );
-    final user = await Storage.user();
-    final activeId = await Storage.activeSourceId();
-    state = state.copyWith(user: () => user, activeId: () => activeId);
-    // Abonnements à jour en arrière-plan (les sources mémorisées restent
-    // utilisables hors ligne).
-    if (token != null) await syncAccount();
+    try {
+      // Tout relire avant d'annoncer « prêt » : sinon la première source de
+      // la liste était active un instant et son catalogue chargé pour rien.
+      final token = await Storage.token();
+      final sources = await Storage.sources();
+      final user = await Storage.user();
+      final activeId = await Storage.activeSourceId();
+      state = state.copyWith(
+        ready: true,
+        token: () => token,
+        user: () => user,
+        sources: sources,
+        activeId: () => activeId,
+      );
+      // Abonnements à jour (en cas d'échec, les sources mémorisées restent
+      // utilisables hors ligne).
+      if (token != null) await syncAccount();
+    } finally {
+      if (!state.ready) state = state.copyWith(ready: true);
+      _restored.complete();
+    }
   }
 
   Future<void> login(String email, String password) async {
@@ -124,8 +139,10 @@ class AppController extends Notifier<AppState> {
     await select(source.id);
   }
 
-  Future<void> removeSource(String id) =>
-      _setSources(state.sources.where((s) => s.id != id).toList());
+  Future<void> removeSource(String id) async {
+    await _setSources(state.sources.where((s) => s.id != id).toList());
+    await CatalogCache.clear(id);
+  }
 
   Future<void> select(String id) async {
     await Storage.saveActiveSourceId(id);
