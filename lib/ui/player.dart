@@ -1,15 +1,23 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../state/library.dart';
 import '../state/settings.dart';
+import 'library_widgets.dart';
 import 'theme.dart';
 import 'title_bar.dart';
+import 'tv_text_field.dart';
 import 'widgets.dart';
+
+/// Télé (Android) : commandes à la télécommande au lieu des commandes
+/// tactiles de media_kit.
+final _tv = Platform.isAndroid;
 
 /// Lecteur partagé, réglé selon les paramètres (tampon, décodage matériel).
 (Player, VideoController) createPlayer(Settings settings) {
@@ -19,13 +27,52 @@ import 'widgets.dart';
       title: 'NexoraTV',
     ),
   );
+  _tuneNative(player);
   final controller = VideoController(
     player,
     configuration: VideoControllerConfiguration(
       enableHardwareAcceleration: settings.hardwareDecoding,
+      // Fire TV Stick / box : MediaCodec, le processeur ne suit pas une
+      // chaîne FHD en logiciel (image au ralenti). « auto-safe », le défaut
+      // de media_kit, ne le choisit pas toujours.
+      hwdec: Platform.isAndroid
+          ? (settings.hardwareDecoding ? 'mediacodec-copy' : 'no')
+          : null,
     ),
   );
   return (player, controller);
+}
+
+/// Réglages libmpv que media_kit ne met pas par défaut (repris de la 1.x,
+/// validés sur Fire TV Stick) : gros cache, reconnexion HTTP, et sur Android
+/// des images sautées plutôt qu'une vidéo qui prend du retard.
+void _tuneNative(Player player) {
+  final native = player.platform;
+  if (native is! NativePlayer) return;
+  final props = <String, String>{
+    // Lecture ~30 s d'avance : encaisse les à-coups réseau et les serveurs
+    // qui limitent le débit.
+    'cache': 'yes',
+    'cache-secs': '30',
+    'demuxer-readahead-secs': '30',
+    // En manque de données : courte pause le temps de refaire 2 s de réserve,
+    // plutôt qu'un hoquet permanent.
+    'cache-pause': 'yes',
+    'cache-pause-wait': '2',
+    'cache-pause-initial': 'yes',
+    // FFmpeg se reconnecte tout seul quand le flux HTTP décroche.
+    'stream-lavf-o':
+        'reconnect=1,reconnect_at_eof=1,reconnect_streamed=1,'
+        'reconnect_on_network_error=1,reconnect_delay_max=5',
+    if (Platform.isAndroid) ...{
+      'framedrop': 'vo',
+      'vd-lavc-fast': 'yes',
+      'vd-lavc-skiploopfilter': 'nonkey',
+    },
+  };
+  for (final e in props.entries) {
+    unawaited(native.setProperty(e.key, e.value));
+  }
 }
 
 /// URL d'une chaîne selon le format choisi (Xtream : .ts ↔ .m3u8).
@@ -261,11 +308,22 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Video(
-              controller: _controller,
-              onEnterFullscreen: enterVideoFullscreen,
-              onExitFullscreen: exitVideoFullscreen,
-            ),
+            if (_tv)
+              _TvPlaybackControls(
+                player: _player,
+                title: title,
+                enabled: !_failed,
+                child: Video(
+                  controller: _controller,
+                  controls: NoVideoControls,
+                ),
+              )
+            else
+              Video(
+                controller: _controller,
+                onEnterFullscreen: enterVideoFullscreen,
+                onExitFullscreen: exitVideoFullscreen,
+              ),
             if (_failed)
               ColoredBox(
                 color: Colors.black.withValues(alpha: 0.8),
@@ -283,6 +341,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
                       ),
                       const SizedBox(width: 12),
                       FilledButton(
+                        autofocus: true,
                         onPressed: _retry,
                         child: const Text('Réessayer'),
                       ),
@@ -295,4 +354,236 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       ),
     );
   }
+}
+
+/// Films et épisodes à la télécommande : OK ou Lecture/Pause, ← → pour
+/// reculer / avancer de 10 s (maintenir pour aller plus loin), CH+ CH− pour
+/// l'épisode précédent / suivant, Retour pour quitter.
+class _TvPlaybackControls extends StatefulWidget {
+  const _TvPlaybackControls({
+    required this.player,
+    required this.title,
+    required this.enabled,
+    required this.child,
+  });
+
+  final Player player;
+  final String title;
+
+  /// Faux pendant l'écran d'erreur (ses boutons reçoivent les touches).
+  final bool enabled;
+  final Widget child;
+
+  @override
+  State<_TvPlaybackControls> createState() => _TvPlaybackControlsState();
+}
+
+class _TvPlaybackControlsState extends State<_TvPlaybackControls> {
+  final _node = FocusNode(debugLabel: 'tv-player');
+  bool _visible = true;
+  Timer? _hide;
+  StreamSubscription<bool>? _playing;
+
+  @override
+  void initState() {
+    super.initState();
+    // En pause, la barre reste affichée.
+    _playing = widget.player.stream.playing.listen((playing) {
+      if (!mounted) return;
+      if (playing) {
+        _scheduleHide();
+      } else {
+        _hide?.cancel();
+        setState(() => _visible = true);
+      }
+    });
+    _scheduleHide();
+  }
+
+  @override
+  void didUpdateWidget(_TvPlaybackControls old) {
+    super.didUpdateWidget(old);
+    // Retour de l'écran d'erreur : les touches reviennent au lecteur.
+    if (widget.enabled && !old.enabled) _node.requestFocus();
+  }
+
+  @override
+  void dispose() {
+    _hide?.cancel();
+    _playing?.cancel();
+    _node.dispose();
+    super.dispose();
+  }
+
+  void _show() {
+    setState(() => _visible = true);
+    _scheduleHide();
+  }
+
+  void _scheduleHide() {
+    _hide?.cancel();
+    _hide = Timer(const Duration(seconds: 4), () {
+      if (mounted && widget.player.state.playing) {
+        setState(() => _visible = false);
+      }
+    });
+  }
+
+  void _seek(int seconds) {
+    final s = widget.player.state;
+    var to = s.position + Duration(seconds: seconds);
+    if (to < Duration.zero) to = Duration.zero;
+    if (s.duration > Duration.zero && to > s.duration) to = s.duration;
+    widget.player.seek(to);
+    _show();
+  }
+
+  KeyEventResult _onKey(FocusNode _, KeyEvent e) {
+    if (!widget.enabled || e is KeyUpEvent) return KeyEventResult.ignored;
+    final k = e.logicalKey;
+    if (k == LogicalKeyboardKey.arrowLeft ||
+        k == LogicalKeyboardKey.mediaRewind) {
+      _seek(-10);
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowRight ||
+        k == LogicalKeyboardKey.mediaFastForward) {
+      _seek(10);
+      return KeyEventResult.handled;
+    }
+    if (e is KeyRepeatEvent) {
+      return tvSelectKeys.contains(k)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    if (tvSelectKeys.contains(k) ||
+        k == LogicalKeyboardKey.mediaPlayPause ||
+        k == LogicalKeyboardKey.mediaPlay ||
+        k == LogicalKeyboardKey.mediaPause ||
+        k == LogicalKeyboardKey.space) {
+      widget.player.playOrPause();
+      _show();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.mediaTrackNext ||
+        k == LogicalKeyboardKey.channelDown) {
+      widget.player.next();
+      _show();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.mediaTrackPrevious ||
+        k == LogicalKeyboardKey.channelUp) {
+      widget.player.previous();
+      _show();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowUp ||
+        k == LogicalKeyboardKey.arrowDown ||
+        k == LogicalKeyboardKey.info) {
+      _show();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) => Focus(
+    focusNode: _node,
+    autofocus: true,
+    onKeyEvent: _onKey,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        widget.player.playOrPause();
+        _show();
+      },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          widget.child,
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: _visible ? 1 : 0,
+                duration: Nx.fast,
+                child: _bar(context),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _bar(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(48, 80, 48, 36),
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.bottomCenter,
+        end: Alignment.topCenter,
+        colors: [Color(0xE6000000), Color(0x00000000)],
+      ),
+    ),
+    child: StreamBuilder<Duration>(
+      stream: widget.player.stream.position,
+      builder: (context, _) {
+        final s = widget.player.state;
+        final total = s.duration;
+        final position = s.position;
+        final fraction = total.inMilliseconds <= 0
+            ? 0.0
+            : (position.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0);
+        const time = TextStyle(
+          color: Nx.text,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          fontFeatures: [FontFeature.tabularFigures()],
+        );
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(
+                  s.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  color: Nx.text,
+                  size: 32,
+                ),
+                const SizedBox(width: 14),
+                Text(formatPosition(position), style: time),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: fraction,
+                    minHeight: 5,
+                    color: Nx.accent,
+                    backgroundColor: Colors.white24,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Text(formatPosition(total), style: time),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'OK : pause / lecture   ·   ← → : 10 s en arrière / en avant   ·   Retour : quitter',
+              style: TextStyle(color: Nx.muted, fontSize: 13),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }

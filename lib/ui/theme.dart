@@ -61,6 +61,25 @@ ThemeData buildTheme() {
   const stadium = StadiumBorder();
   const padding = EdgeInsets.symmetric(horizontal: 26, vertical: 18);
 
+  // Focus télécommande / clavier : l'ombrage Material par défaut est
+  // invisible sur une télé. Contour franc + fond teinté sur tous les boutons.
+  WidgetStateProperty<BorderSide?> focusSide(
+    BorderSide? normal, {
+    Color color = Nx.accent,
+  }) => WidgetStateProperty.resolveWith(
+    (s) => s.contains(WidgetState.focused)
+        ? BorderSide(color: color, width: 2.5)
+        : normal,
+  );
+  WidgetStateProperty<Color?> focusOverlay(
+    Color tint,
+  ) => WidgetStateProperty.resolveWith((s) {
+    if (s.contains(WidgetState.focused)) return tint.withValues(alpha: 0.2);
+    if (s.contains(WidgetState.pressed)) return tint.withValues(alpha: 0.14);
+    if (s.contains(WidgetState.hovered)) return tint.withValues(alpha: 0.08);
+    return null;
+  });
+
   return base.copyWith(
     textTheme: text.copyWith(
       displaySmall: display(text.displaySmall, size: 34),
@@ -77,34 +96,65 @@ ThemeData buildTheme() {
       thickness: 1,
     ),
     filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        backgroundColor: Nx.accent,
-        foregroundColor: Nx.bg,
-        disabledBackgroundColor: Nx.accent.withValues(alpha: 0.4),
-        shape: stadium,
-        padding: padding,
-        textStyle: const TextStyle(
-          fontWeight: FontWeight.w700,
-          fontSize: 15,
-          fontFamily: 'Manrope',
-        ),
-      ),
+      style:
+          FilledButton.styleFrom(
+            backgroundColor: Nx.accent,
+            foregroundColor: Nx.bg,
+            disabledBackgroundColor: Nx.accent.withValues(alpha: 0.4),
+            shape: stadium,
+            padding: padding,
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              fontFamily: 'Manrope',
+            ),
+          ).copyWith(
+            // Bouton corail : contour blanc pour trancher sur le fond du bouton.
+            side: focusSide(null, color: Nx.text),
+            overlayColor: focusOverlay(Colors.white),
+          ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Nx.text,
-        side: const BorderSide(color: Nx.borderStrong),
-        shape: stadium,
-        padding: padding,
-        textStyle: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 15,
-          fontFamily: 'Manrope',
-        ),
-      ),
+      style:
+          OutlinedButton.styleFrom(
+            foregroundColor: Nx.text,
+            shape: stadium,
+            padding: padding,
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+              fontFamily: 'Manrope',
+            ),
+          ).copyWith(
+            side: focusSide(const BorderSide(color: Nx.borderStrong)),
+            overlayColor: focusOverlay(Nx.accent),
+          ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: Nx.accent, shape: stadium),
+      style: TextButton.styleFrom(
+        foregroundColor: Nx.accent,
+        shape: stadium,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      ).copyWith(side: focusSide(null), overlayColor: focusOverlay(Nx.accent)),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: ButtonStyle(
+        side: focusSide(null),
+        overlayColor: focusOverlay(Nx.accent),
+      ),
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: ButtonStyle(overlayColor: focusOverlay(Nx.text)),
+    ),
+    switchTheme: SwitchThemeData(
+      // Contour blanc autour de l'interrupteur qui a le focus.
+      trackOutlineColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.focused) ? Nx.text : null,
+      ),
+      trackOutlineWidth: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.focused) ? 3 : null,
+      ),
+      overlayColor: focusOverlay(Nx.accent),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,

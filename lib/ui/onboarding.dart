@@ -7,6 +7,7 @@ import '../core/config.dart';
 import '../core/models.dart';
 import '../state/app_state.dart';
 import 'theme.dart';
+import 'tv_text_field.dart';
 import 'widgets.dart';
 
 /// Logo texte « NexoraTV » (TV en corail, comme sur le site).
@@ -256,7 +257,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     subtitle: 'Avec votre compte $kApiBase'.replaceFirst('https://', ''),
     children: [
       if (_error != null) ErrorBanner(_error!),
-      TextField(
+      TvTextField(
         controller: _email,
         autofocus: true,
         keyboardType: TextInputType.emailAddress,
@@ -265,7 +266,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         onSubmitted: (_) => _submit(),
       ),
       const SizedBox(height: 14),
-      TextField(
+      TvTextField(
         controller: _password,
         obscureText: true,
         autofillHints: const [AutofillHints.password],
@@ -389,13 +390,13 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
         ),
         const SizedBox(height: 20),
         if (_error != null) ErrorBanner(_error!),
-        TextField(
+        TvTextField(
           controller: _name,
           decoration: const InputDecoration(labelText: 'Nom (facultatif)'),
         ),
         const SizedBox(height: 14),
         if (xtream) ...[
-          TextField(
+          TvTextField(
             controller: _server,
             decoration: const InputDecoration(
               labelText: 'Adresse du serveur',
@@ -403,19 +404,19 @@ class _AddSourceScreenState extends ConsumerState<AddSourceScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          TextField(
+          TvTextField(
             controller: _user,
             decoration: const InputDecoration(labelText: 'Utilisateur'),
           ),
           const SizedBox(height: 14),
-          TextField(
+          TvTextField(
             controller: _pass,
             obscureText: true,
             decoration: const InputDecoration(labelText: 'Mot de passe'),
             onSubmitted: (_) => _submit(),
           ),
         ] else
-          TextField(
+          TvTextField(
             controller: _m3u,
             decoration: const InputDecoration(
               labelText: 'URL de la playlist',

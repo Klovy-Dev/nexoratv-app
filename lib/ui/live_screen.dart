@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,11 +18,35 @@ import 'player.dart';
 import 'shell.dart';
 import 'theme.dart';
 import 'title_bar.dart';
+import 'toast.dart';
+import 'tv_text_field.dart';
 import 'widgets.dart';
+
+/// Télé (Android) : plein écran et commandes pensés pour la télécommande.
+final _tv = Platform.isAndroid;
+
+/// Ce que le plein écran télé affiche de la chaîne en cours.
+class _LiveStatus {
+  const _LiveStatus({
+    this.channel,
+    this.epg = const [],
+    this.reconnecting = false,
+    this.failed = false,
+    this.retries = 0,
+  });
+
+  final LiveChannel? channel;
+  final List<EpgEntry> epg;
+  final bool reconnecting;
+  final bool failed;
+  final int retries;
+}
 
 /// TV en direct : catégories | chaînes | lecteur intégré.
 /// Clavier : ↑ ↓ (ou Page ↑ ↓) pour zapper, F plein écran, Espace pause,
-/// M couper le son.
+/// M couper le son. Télécommande : OK lance la chaîne, OK à nouveau sur la
+/// chaîne en cours passe en plein écran (↑ ↓ zappent, Retour en sort), OK
+/// maintenu ouvre le menu (favoris).
 class LiveScreen extends ConsumerStatefulWidget {
   const LiveScreen({super.key});
 
@@ -83,9 +109,36 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
 
   final _channelScroll = ScrollController();
 
+  /// Suivi par le plein écran télé (qui vit sur sa propre route).
+  final _status = ValueNotifier(const _LiveStatus());
+
+  // Chien de garde : un direct qui gèle (image figée, position qui
+  // n'avance plus) n'émet souvent ni erreur ni fin. Au bout de ~12 s, on
+  // relance le flux sans rien demander.
+  Timer? _stallTimer;
+  Duration _lastPosition = Duration.zero;
+  int _stalledTicks = 0;
+
+  /// Toute mise à jour de l'écran est aussi transmise au plein écran.
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _status.value = _LiveStatus(
+      channel: _current,
+      epg: _epg,
+      reconnecting: _reconnecting,
+      failed: _failed,
+      retries: _retries,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
+    _stallTimer = Timer.periodic(
+      const Duration(seconds: 4),
+      (_) => _checkStall(),
+    );
     _subs
       ..add(_player.stream.error.listen((_) => _onStreamLost()))
       // Un direct qui « se termine » a en fait décroché.
@@ -113,6 +166,8 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     _channelScroll.dispose();
     _retryTimer?.cancel();
     _epgTick?.cancel();
+    _stallTimer?.cancel();
+    _status.dispose();
     for (final s in _subs) {
       s.cancel();
     }
@@ -140,6 +195,26 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     _retryTimer = Timer(Duration(seconds: _retries), () {
       if (mounted && identical(_current, channel)) _open(channel);
     });
+  }
+
+  void _checkStall() {
+    final channel = _current;
+    final state = _player.state;
+    if (!mounted ||
+        channel == null ||
+        _failed ||
+        _reconnecting ||
+        !state.playing) {
+      _stalledTicks = 0;
+      return;
+    }
+    if (state.position > _lastPosition) {
+      _stalledTicks = 0;
+    } else if (++_stalledTicks >= 3) {
+      _stalledTicks = 0;
+      _open(channel);
+    }
+    _lastPosition = state.position;
   }
 
   Future<void> _loadEpg(LiveChannel channel) async {
@@ -221,6 +296,8 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     final first = _current == null;
     _retryTimer?.cancel();
     _retries = 0;
+    _lastPosition = Duration.zero;
+    _stalledTicks = 0;
     setState(() {
       _current = channel;
       _failed = false;
@@ -231,9 +308,71 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     _loadEpg(channel);
     _revealInList(channel);
     if (first && settings.startLiveFullscreen) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _videoKey.currentState?.enterFullscreen(),
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) => _enterFullscreen());
+    }
+  }
+
+  /// Clic / OK sur une chaîne : la lance, ou passe en plein écran si c'est
+  /// déjà celle qu'on regarde (le « double clic » de la télécommande).
+  void _onChannelActivated(LiveChannel channel) {
+    if (channel.id == _current?.id && !_failed) {
+      _enterFullscreen();
+    } else {
+      _play(channel);
+    }
+  }
+
+  void _enterFullscreen() {
+    if (!mounted || _current == null) return;
+    if (!_tv) {
+      _videoKey.currentState?.enterFullscreen();
+      return;
+    }
+    enterVideoFullscreen();
+    Navigator.of(context)
+        .push(
+          PageRouteBuilder<void>(
+            transitionDuration: const Duration(milliseconds: 200),
+            reverseTransitionDuration: const Duration(milliseconds: 160),
+            pageBuilder: (_, _, _) => _TvLiveFullscreen(
+              player: _player,
+              video: _video,
+              status: _status,
+              onZap: _zap,
+              onRetry: () {
+                final c = _current;
+                if (c != null) _play(c);
+              },
+            ),
+            transitionsBuilder: (_, a, _, child) =>
+                FadeTransition(opacity: a, child: child),
+          ),
+        )
+        .whenComplete(exitVideoFullscreen);
+  }
+
+  /// OK maintenu (ou clic droit) sur une chaîne : favoris, plein écran.
+  Future<void> _channelMenu(LiveChannel channel) async {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final library = ref.read(libraryProvider.notifier);
+    final favorite = _favIds.contains(channel.id);
+    final choice = await showDialog<_MenuChoice>(
+      context: context,
+      builder: (_) => _ChannelMenu(channel: channel, favorite: favorite),
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case _MenuChoice.favorite:
+        library.toggleFavorite(MediaKind.live, channel.id);
+        showToastIn(
+          overlay,
+          favorite
+              ? '${channel.name} retirée des favoris.'
+              : '${channel.name} ajoutée aux favoris.',
+        );
+      case _MenuChoice.fullscreen:
+        if (channel.id != _current?.id) _play(channel);
+        WidgetsBinding.instance.addPostFrameCallback((_) => _enterFullscreen());
     }
   }
 
@@ -377,7 +516,8 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                 favoriteIds: _favIds,
                 current: _current,
                 onSearch: _onSearch,
-                onPlay: _play,
+                onPlay: _onChannelActivated,
+                onMenu: _channelMenu,
               ),
             ),
             const VerticalDivider(width: 1),
@@ -424,40 +564,45 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            MaterialDesktopVideoControlsTheme(
-              normal: playerControlsTheme(
-                seekBar: false,
-                shortcuts: _shortcuts,
-                bottomButtonBar: _liveButtons,
-              ),
-              fullscreen: playerControlsTheme(
-                seekBar: false,
-                shortcuts: _shortcuts,
-                bottomButtonBar: _liveButtons,
-                topButtonBar: [
-                  if (current != null)
-                    Text(
-                      current.name,
-                      style: const TextStyle(
-                        fontFamily: Nx.display,
-                        fontSize: 18,
+            if (_tv)
+              Video(controller: _video, controls: NoVideoControls)
+            else
+              MaterialDesktopVideoControlsTheme(
+                normal: playerControlsTheme(
+                  seekBar: false,
+                  shortcuts: _shortcuts,
+                  bottomButtonBar: _liveButtons,
+                ),
+                fullscreen: playerControlsTheme(
+                  seekBar: false,
+                  shortcuts: _shortcuts,
+                  bottomButtonBar: _liveButtons,
+                  topButtonBar: [
+                    if (current != null)
+                      Text(
+                        current.name,
+                        style: const TextStyle(
+                          fontFamily: Nx.display,
+                          fontSize: 18,
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
+                child: Video(
+                  key: _videoKey,
+                  controller: _video,
+                  onEnterFullscreen: enterVideoFullscreen,
+                  onExitFullscreen: exitVideoFullscreen,
+                ),
               ),
-              child: Video(
-                key: _videoKey,
-                controller: _video,
-                onEnterFullscreen: enterVideoFullscreen,
-                onExitFullscreen: exitVideoFullscreen,
-              ),
-            ),
             if (current == null)
-              const IgnorePointer(
+              IgnorePointer(
                 child: MessageView(
                   icon: Icons.live_tv_rounded,
                   title: 'Choisissez une chaîne',
-                  message: 'Cliquez sur une chaîne dans la liste pour la regarder ici.',
+                  message: _tv
+                      ? 'OK sur une chaîne pour la regarder ici, OK une seconde fois pour le plein écran.'
+                      : 'Cliquez sur une chaîne dans la liste pour la regarder ici.',
                 ),
               ),
             if (_reconnecting && !_failed)
@@ -538,38 +683,45 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          FavoriteButton(kind: MediaKind.live, id: current.id),
-          const SizedBox(width: 8),
-          IconButton.outlined(
-            tooltip: 'Chaîne précédente (↑)',
-            onPressed: () => _zap(-1),
-            icon: const Icon(Icons.keyboard_arrow_up_rounded),
-          ),
-          const SizedBox(width: 8),
-          IconButton.outlined(
-            tooltip: 'Chaîne suivante (↓)',
-            onPressed: () => _zap(1),
-            icon: const Icon(Icons.keyboard_arrow_down_rounded),
-          ),
-          const SizedBox(width: 8),
-          const Tooltip(
-            message:
-                '↑ ↓  changer de chaîne\n'
-                'F  plein écran (ou double-clic)\n'
-                'Espace  pause\n'
-                'M  couper le son',
-            child: Padding(
-              padding: EdgeInsets.all(8),
-              child: Icon(Icons.keyboard_outlined, color: Nx.muted),
+          if (_tv)
+            const Text(
+              'OK : plein écran   ·   OK maintenu : favoris',
+              style: TextStyle(color: Nx.muted, fontSize: 12.5),
+            )
+          else ...[
+            const SizedBox(width: 12),
+            FavoriteButton(kind: MediaKind.live, id: current.id),
+            const SizedBox(width: 8),
+            IconButton.outlined(
+              tooltip: 'Chaîne précédente (↑)',
+              onPressed: () => _zap(-1),
+              icon: const Icon(Icons.keyboard_arrow_up_rounded),
             ),
-          ),
-          const SizedBox(width: 8),
-          IconButton.filled(
-            tooltip: 'Plein écran (F)',
-            onPressed: () => _videoKey.currentState?.enterFullscreen(),
-            icon: const Icon(Icons.fullscreen_rounded),
-          ),
+            const SizedBox(width: 8),
+            IconButton.outlined(
+              tooltip: 'Chaîne suivante (↓)',
+              onPressed: () => _zap(1),
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
+            ),
+            const SizedBox(width: 8),
+            const Tooltip(
+              message:
+                  '↑ ↓  changer de chaîne\n'
+                  'F  plein écran (ou double-clic)\n'
+                  'Espace  pause\n'
+                  'M  couper le son',
+              child: Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(Icons.keyboard_outlined, color: Nx.muted),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              tooltip: 'Plein écran (F)',
+              onPressed: () => _videoKey.currentState?.enterFullscreen(),
+              icon: const Icon(Icons.fullscreen_rounded),
+            ),
+          ],
         ],
       );
 
@@ -792,6 +944,7 @@ class _ChannelPane extends StatelessWidget {
     required this.current,
     required this.onSearch,
     required this.onPlay,
+    required this.onMenu,
   });
 
   /// Hauteur fixe d'une ligne (sert aussi à faire défiler jusqu'à la
@@ -804,6 +957,7 @@ class _ChannelPane extends StatelessWidget {
   final LiveChannel? current;
   final ValueChanged<String> onSearch;
   final ValueChanged<LiveChannel> onPlay;
+  final ValueChanged<LiveChannel> onMenu;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -836,6 +990,7 @@ class _ChannelPane extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 2),
                       child: ListRow(
                         onTap: () => onPlay(c),
+                        onLongPress: () => onMenu(c),
                         selected: playing,
                         padding: const EdgeInsets.only(left: 7, right: 10),
                         child: Row(
@@ -1028,6 +1183,428 @@ class _EpgPanel extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/* ---------- Télécommande : menu d'une chaîne, plein écran ---------- */
+
+enum _MenuChoice { favorite, fullscreen }
+
+/// Menu de l'appui long sur une chaîne.
+class _ChannelMenu extends StatelessWidget {
+  const _ChannelMenu({required this.channel, required this.favorite});
+
+  final LiveChannel channel;
+  final bool favorite;
+
+  @override
+  Widget build(BuildContext context) => Focus(
+    // Le menu s'ouvre alors que OK est encore maintenu : ses répétitions
+    // activeraient tout de suite la première option.
+    canRequestFocus: false,
+    skipTraversal: true,
+    onKeyEvent: (_, e) =>
+        e is KeyRepeatEvent && tvSelectKeys.contains(e.logicalKey)
+        ? KeyEventResult.handled
+        : KeyEventResult.ignored,
+    child: Dialog(
+      backgroundColor: Nx.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Nx.radius),
+        side: const BorderSide(color: Nx.border),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 4, 6, 16),
+                child: Row(
+                  children: [
+                    ChannelLogo(channel: channel, width: 64, height: 40),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        channel.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _MenuItem(
+                autofocus: true,
+                icon: favorite
+                    ? Icons.star_rounded
+                    : Icons.star_outline_rounded,
+                iconColor: Nx.warning,
+                label: favorite ? 'Retirer des favoris' : 'Ajouter aux favoris',
+                onTap: () => Navigator.of(context).pop(_MenuChoice.favorite),
+              ),
+              const SizedBox(height: 6),
+              _MenuItem(
+                icon: Icons.fullscreen_rounded,
+                label: 'Regarder en plein écran',
+                onTap: () => Navigator.of(context).pop(_MenuChoice.fullscreen),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _MenuItem extends StatefulWidget {
+  const _MenuItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.iconColor = Nx.text,
+    this.autofocus = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color iconColor;
+  final bool autofocus;
+
+  @override
+  State<_MenuItem> createState() => _MenuItemState();
+}
+
+class _MenuItemState extends State<_MenuItem> {
+  bool _lit = false;
+  bool _focus = false;
+
+  @override
+  Widget build(BuildContext context) => FocusableActionDetector(
+    autofocus: widget.autofocus,
+    mouseCursor: SystemMouseCursors.click,
+    actions: {
+      ActivateIntent: CallbackAction<ActivateIntent>(
+        onInvoke: (_) {
+          widget.onTap();
+          return null;
+        },
+      ),
+    },
+    onShowHoverHighlight: (v) => setState(() => _lit = v),
+    onShowFocusHighlight: (v) => setState(() => _focus = v),
+    child: GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedContainer(
+        duration: Nx.fast,
+        curve: Nx.ease,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: _focus || _lit ? Nx.surface2 : Colors.transparent,
+          borderRadius: BorderRadius.circular(Nx.radiusSm),
+          border: Border.all(
+            color: _focus ? Nx.accent : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(widget.icon, color: widget.iconColor),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                widget.label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// Plein écran télé : ↑ ↓ (ou CH+ CH−) zappent, OK affiche le bandeau (ou
+/// relance un flux en erreur), Lecture/Pause met en pause, Retour quitte.
+class _TvLiveFullscreen extends StatefulWidget {
+  const _TvLiveFullscreen({
+    required this.player,
+    required this.video,
+    required this.status,
+    required this.onZap,
+    required this.onRetry,
+  });
+
+  final Player player;
+  final VideoController video;
+  final ValueListenable<_LiveStatus> status;
+  final ValueChanged<int> onZap;
+  final VoidCallback onRetry;
+
+  @override
+  State<_TvLiveFullscreen> createState() => _TvLiveFullscreenState();
+}
+
+class _TvLiveFullscreenState extends State<_TvLiveFullscreen> {
+  static final _up = {
+    LogicalKeyboardKey.arrowUp,
+    LogicalKeyboardKey.channelUp,
+    LogicalKeyboardKey.pageUp,
+  };
+  static final _down = {
+    LogicalKeyboardKey.arrowDown,
+    LogicalKeyboardKey.channelDown,
+    LogicalKeyboardKey.pageDown,
+  };
+  static final _playPause = {
+    LogicalKeyboardKey.mediaPlayPause,
+    LogicalKeyboardKey.mediaPlay,
+    LogicalKeyboardKey.mediaPause,
+    LogicalKeyboardKey.space,
+  };
+
+  bool _banner = true;
+  Timer? _hide;
+  String? _channelId;
+
+  @override
+  void initState() {
+    super.initState();
+    _channelId = widget.status.value.channel?.id;
+    widget.status.addListener(_onStatus);
+    _showBanner();
+  }
+
+  @override
+  void dispose() {
+    widget.status.removeListener(_onStatus);
+    _hide?.cancel();
+    super.dispose();
+  }
+
+  void _onStatus() {
+    final id = widget.status.value.channel?.id;
+    if (id != _channelId) {
+      _channelId = id;
+      _showBanner();
+    } else if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _showBanner() {
+    _hide?.cancel();
+    if (mounted) setState(() => _banner = true);
+    _hide = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _banner = false);
+    });
+  }
+
+  KeyEventResult _onKey(FocusNode _, KeyEvent e) {
+    final k = e.logicalKey;
+    final ours =
+        _up.contains(k) ||
+        _down.contains(k) ||
+        _playPause.contains(k) ||
+        tvSelectKeys.contains(k) ||
+        k == LogicalKeyboardKey.arrowLeft ||
+        k == LogicalKeyboardKey.arrowRight ||
+        k == LogicalKeyboardKey.info;
+    if (!ours) return KeyEventResult.ignored;
+    // Une touche maintenue ne zappe qu'une fois (chaque zapping ouvre un flux).
+    if (e is! KeyDownEvent) return KeyEventResult.handled;
+    if (_up.contains(k)) {
+      widget.onZap(-1);
+    } else if (_down.contains(k)) {
+      widget.onZap(1);
+    } else if (_playPause.contains(k)) {
+      widget.player.playOrPause();
+      _showBanner();
+    } else if (tvSelectKeys.contains(k) && widget.status.value.failed) {
+      widget.onRetry();
+    } else {
+      _showBanner();
+    }
+    return KeyEventResult.handled;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.status.value;
+    final channel = s.channel;
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Focus(
+        autofocus: true,
+        onKeyEvent: _onKey,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _showBanner,
+          onDoubleTap: () => Navigator.of(context).maybePop(),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Video(controller: widget.video, controls: NoVideoControls),
+              if (s.reconnecting && !s.failed)
+                Center(child: _ReconnectChip(retries: s.retries)),
+              if (s.failed)
+                const ColoredBox(
+                  color: Color(0xC0000000),
+                  child: MessageView(
+                    icon: Icons
+                        .signal_wifi_statusbar_connected_no_internet_4_rounded,
+                    title: 'Flux indisponible',
+                    message: 'OK pour réessayer, ↑ ↓ pour changer de chaîne, Retour pour quitter le plein écran.',
+                  ),
+                ),
+              if (channel != null)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: IgnorePointer(
+                    child: AnimatedOpacity(
+                      opacity: _banner ? 1 : 0,
+                      duration: Nx.fast,
+                      child: _TvBanner(channel: channel, epg: s.epg),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReconnectChip extends StatelessWidget {
+  const _ReconnectChip({required this.retries});
+  final int retries;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+    decoration: BoxDecoration(
+      color: Colors.black.withValues(alpha: 0.7),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox.square(
+          dimension: 18,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Nx.accent),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          'Reconnexion… ($retries/${_LiveScreenState._maxRetries})',
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Bandeau du bas en plein écran : chaîne, programme en cours et suivant.
+class _TvBanner extends StatelessWidget {
+  const _TvBanner({required this.channel, required this.epg});
+
+  final LiveChannel channel;
+  final List<EpgEntry> epg;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final i = epg.indexWhere(
+      (e) => !e.start.isAfter(now) && e.end.isAfter(now),
+    );
+    final current = i < 0 ? null : epg[i];
+    final next = i >= 0 && i + 1 < epg.length
+        ? epg[i + 1]
+        : (i < 0 && epg.isNotEmpty ? epg.first : null);
+    const muted = TextStyle(color: Nx.muted, fontSize: 14);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(48, 80, 48, 40),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [Color(0xE6000000), Color(0x00000000)],
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          ChannelLogo(channel: channel, width: 120, height: 72),
+          const SizedBox(width: 24),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  channel.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                if (current != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        '${_EpgPanel._hm(current.start)} – ${_EpgPanel._hm(current.end)}',
+                        style: muted,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          current.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  LinearProgressIndicator(
+                    value: current.progressAt(now),
+                    color: Nx.accent,
+                    backgroundColor: Colors.white24,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ],
+                if (next != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Ensuite  ${_EpgPanel._hm(next.start)}  ${next.title}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: muted,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 24),
+          const Text('↑ ↓ : chaîne   ·   Retour : quitter', style: muted),
+        ],
       ),
     );
   }

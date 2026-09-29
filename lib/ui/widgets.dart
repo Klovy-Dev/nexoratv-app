@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'theme.dart';
+import 'tv_text_field.dart';
 
 /// Carte animée au survol : soulèvement, léger zoom, bordure corail et
 /// ombre (même langage que les cartes du site).
@@ -193,12 +197,16 @@ class ListRow extends StatefulWidget {
     super.key,
     required this.child,
     required this.onTap,
+    this.onLongPress,
     this.selected = false,
     this.padding = const EdgeInsets.symmetric(horizontal: 12),
   });
 
   final Widget child;
   final VoidCallback onTap;
+
+  /// OK maintenu (télécommande), clic droit ou appui long (souris).
+  final VoidCallback? onLongPress;
   final bool selected;
   final EdgeInsetsGeometry padding;
 
@@ -207,11 +215,51 @@ class ListRow extends StatefulWidget {
 }
 
 class _ListRowState extends State<ListRow> {
+  /// Durée d'appui sur OK au-delà de laquelle c'est un appui long.
+  static const _longPress = Duration(milliseconds: 500);
+
   bool _hover = false;
   bool _focus = false;
+  Timer? _hold;
 
   @override
-  Widget build(BuildContext context) => FocusableActionDetector(
+  void dispose() {
+    _hold?.cancel();
+    super.dispose();
+  }
+
+  /// OK court = clic, OK maintenu = [ListRow.onLongPress]. La touche est
+  /// gérée ici (avant les raccourcis de l'appli, qui activeraient la ligne
+  /// en boucle tant qu'on appuie).
+  KeyEventResult _onKey(FocusNode _, KeyEvent e) {
+    if (!tvSelectKeys.contains(e.logicalKey)) return KeyEventResult.ignored;
+    if (e is KeyDownEvent) {
+      _hold?.cancel();
+      _hold = Timer(_longPress, () {
+        _hold = null;
+        widget.onLongPress?.call();
+      });
+    } else if (e is KeyUpEvent && _hold != null) {
+      _hold!.cancel();
+      _hold = null;
+      widget.onTap();
+    }
+    return KeyEventResult.handled;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final row = _row();
+    if (widget.onLongPress == null) return row;
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: _onKey,
+      child: row,
+    );
+  }
+
+  Widget _row() => FocusableActionDetector(
     mouseCursor: SystemMouseCursors.click,
     actions: {
       ActivateIntent: CallbackAction<ActivateIntent>(
@@ -225,6 +273,8 @@ class _ListRowState extends State<ListRow> {
     onShowFocusHighlight: (v) => setState(() => _focus = v),
     child: GestureDetector(
       onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
+      onSecondaryTap: widget.onLongPress,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
         decoration: BoxDecoration(
@@ -457,7 +507,7 @@ class SearchField extends StatelessWidget {
   final ValueChanged<String> onChanged;
 
   @override
-  Widget build(BuildContext context) => TextField(
+  Widget build(BuildContext context) => TvTextField(
     onChanged: onChanged,
     style: const TextStyle(fontSize: 14),
     decoration: InputDecoration(

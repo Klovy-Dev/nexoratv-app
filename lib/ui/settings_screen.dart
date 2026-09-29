@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -114,15 +116,28 @@ class _TabItem extends StatefulWidget {
 
 class _TabItemState extends State<_TabItem> {
   bool _hover = false;
+  bool _focus = false;
 
   @override
   Widget build(BuildContext context) {
     final sel = widget.selected;
-    final color = sel ? Nx.accent : (_hover ? Nx.text : Nx.muted);
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
+    final lit = _hover || _focus;
+    final color = sel ? Nx.accent : (lit ? Nx.text : Nx.muted);
+    // Focusable à la télécommande : flèches pour passer d'un onglet à
+    // l'autre, OK pour l'ouvrir (le focus arrive d'abord sur l'onglet actif).
+    return FocusableActionDetector(
+      autofocus: Platform.isAndroid && sel,
+      mouseCursor: SystemMouseCursors.click,
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap();
+            return null;
+          },
+        ),
+      },
+      onShowHoverHighlight: (v) => setState(() => _hover = v),
+      onShowFocusHighlight: (v) => setState(() => _focus = v),
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
@@ -130,12 +145,16 @@ class _TabItemState extends State<_TabItem> {
           curve: Nx.ease,
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          transform: Matrix4.translationValues(_hover && !sel ? 4 : 0, 0, 0),
+          transform: Matrix4.translationValues(lit && !sel ? 4 : 0, 0, 0),
           decoration: BoxDecoration(
             color: sel
                 ? Nx.accent.withValues(alpha: 0.1)
-                : (_hover ? Nx.surface : Colors.transparent),
+                : (lit ? Nx.surface : Colors.transparent),
             borderRadius: BorderRadius.circular(Nx.radiusSm),
+            border: Border.all(
+              color: _focus ? Nx.accent : Colors.transparent,
+              width: 2,
+            ),
           ),
           child: Row(
             children: [
@@ -346,7 +365,7 @@ class _StoragePanelState extends ConsumerState<_StoragePanel> {
           ),
           _Row(
             title: 'Vider le cache des images',
-            subtitle: 'Supprime les logos et affiches enregistrés sur ce PC (ils se re-téléchargent au besoin).',
+            subtitle: 'Supprime les logos et affiches enregistrés sur cet appareil (ils se re-téléchargent au besoin).',
             trailing: ActionButton(
               label: 'Vider',
               icon: Icons.delete_outline_rounded,
@@ -375,7 +394,9 @@ class _AboutPanel extends StatelessWidget {
         children: [
           _Row(
             title: 'Version',
-            subtitle: 'NexoraTV pour Windows',
+            subtitle: Platform.isAndroid
+                ? 'NexoraTV pour Android TV / Fire TV'
+                : 'NexoraTV pour Windows',
             trailing: FutureBuilder<String>(
               future: Updater.currentVersion(),
               builder: (_, snap) => Text(
